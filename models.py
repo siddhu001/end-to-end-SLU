@@ -722,6 +722,7 @@ class Model(torch.nn.Module):
 		self.unfreezing_type = config.unfreezing_type
 		self.unfreezing_index = config.starting_unfreezing_index
 		self.intent_layers = []
+		
 		if config.pretraining_type != 0:
 			self.freeze_all_layers()
 		self.seq2seq = config.seq2seq
@@ -1013,21 +1014,31 @@ class Model(torch.nn.Module):
 		final_words_normalised_weight=final_words_normalised_weight.reshape(x_words_old_shape[0],x_words_old_shape[1], 1, k)
 		return final_words, final_words_normalised_weight
 
-	def test(self, x, y_intent): # code to return error cases for trained model
+	def test(self, x, y_intent, nlu_setup = False, embed_layer = None, semantic_only = False): # code to return error cases for trained model
 		"""
 		x : Tensor of shape (batch size, T)
 		y_intent : LongTensor of shape (batch size, num_slots)
 		"""
 		if self.is_cuda:
 			y_intent = y_intent.cuda()
-		out = self.pretrained_model.compute_features(x)
+		if not nlu_setup:
+			
+			out = self.pretrained_model.compute_features(x)
+		else:
+			assert embed_layer is not None
+			out = embed_layer(x.long())
+		
 		if self.use_semantic_embeddings:
 			if self.smooth_semantic:
+				
 				x_words, x_weight = self.get_top_words( x, k=self.smooth_semantic_parameter)
 				smooth_word_emb=self.semantic_embeddings(x_words)
 				word_emb=torch.matmul(x_weight, smooth_word_emb).reshape(x_weight.shape[0],x_weight.shape[1],-1) # multiply the embeddings with the prediction probability to get combined embedding
 			else:
-				x_words = self.get_words(x) # get words predicted by ASR
+				if not nlu_setup:
+					x_words = self.get_words(x) # get words predicted by ASR
+				else:
+					x_words = x.long()
 				word_emb=self.semantic_embeddings(x_words)
 			out = torch.cat((out,word_emb),dim=-1)
 
@@ -1056,8 +1067,11 @@ class Model(torch.nn.Module):
 			return -log_probs.mean(), torch.tensor([0.])
 
 
-	def predict_intents(self, x):
-		out = self.pretrained_model.compute_features(x)
+	def predict_intents(self, x, from_text = False):
+		if not from_text:
+			out = self.pretrained_model.compute_features(x)
+		else:
+			out = x
 
 		if not self.seq2seq:
 			for layer in self.intent_layers:

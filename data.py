@@ -137,7 +137,7 @@ def read_config(config_file):
 
 	return config
 
-def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False, single_label=True):
+def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False, single_label=True, use_all_gold = False):
 	"""
 	config: Config object (contains info about model and training)
 	"""
@@ -270,8 +270,22 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 		train_dataset = SLU_GoldDataset(train_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
 	else:
 		train_dataset = SLUDataset(train_df, base_path, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
-	valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config)
-	test_dataset = SLUDataset(test_df, base_path, Sy_intent, config)
+	if not use_all_gold:
+		valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config)
+		test_dataset = SLUDataset(test_df, base_path, Sy_intent, config)
+	else:
+		
+		valid_dataset = SLU_GoldDataset(valid_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+		test_dataset = SLU_GoldDataset(test_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+	#valid_dataset = SLU_GoldDataset(valid_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+	#test_dataset = SLU_GoldDataset(test_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+	# else:
+	# 	Sy_word = []
+	# 	with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
+	# 		for line in f.readlines():
+	# 			Sy_word.append(line.rstrip("\n"))
+	# 	valid_dataset = SLU_GoldDataset(valid_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+	# 	test_dataset = SLU_GoldDataset(test_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
 
 	return train_dataset, valid_dataset, test_dataset
 
@@ -367,7 +381,7 @@ class SLUDataset(torch.utils.data.Dataset):
 
 # Class to load data used to train intent model on gold set utterances
 class SLU_GoldDataset(torch.utils.data.Dataset):
-	def __init__(self, df, base_path, Sy_word, Sy_intent, config, upsample_factor=1):
+	def __init__(self, df, base_path, Sy_word, Sy_intent, config, upsample_factor=1, collate = 'wavs'):
 		"""
 		df:
 		Sy_intent: Dictionary (transcript --> slot values)
@@ -386,7 +400,6 @@ class SLU_GoldDataset(torch.utils.data.Dataset):
 		self.config_vocab_size = config.vocabulary_size
 		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU(self.Sy_intent, self.seq2seq))
 		self.config = config
-
 	def __len__(self):
 		#if self.augment: return len(self.df)*2 # second half of dataset is augmented
 		return len(self.df) * self.upsample_factor
@@ -443,13 +456,15 @@ class CollateWavsSLU:
 		"""
 		x = []; x_paths=[]; y_intent = []
 		batch_size = len(batch)
+		
 		for index in range(batch_size):
+			
 			x_, x_path, y_intent_ = batch[index]
 
 			x.append(torch.tensor(x_).float())
 			y_intent.append(torch.tensor(y_intent_).long())
 			x_paths.append(x_path)
-
+		
 		# pad all sequences to have same length
 		if not self.seq2seq:
 			T = max([len(x_) for x_ in x])
@@ -476,6 +491,60 @@ class CollateWavsSLU:
 			y_intent = one_hot(y_intent, self.num_labels)
 
 			return (x,x_paths,y_intent) # Added support for returning audio paths
+
+
+# class CollateTranscriptSLU:
+# 	def __init__(self, Sy_intent, seq2seq):
+# 		self.Sy_intent = Sy_intent
+# 		self.num_labels = len(self.Sy_intent)
+# 		self.seq2seq = seq2seq
+# 		if self.seq2seq:
+# 			self.EOS = self.Sy_intent.index("<eos>")
+
+# 	def __call__(self, batch):
+# 		"""
+# 		batch: list of tuples (input wav, intent labels)
+
+# 		Returns a minibatch of wavs and labels as Tensors.
+# 		"""
+# 		x = []; x_paths=[]; y_intent = []
+# 		batch_size = len(batch)
+		
+# 		for index in range(batch_size):
+			
+# 			x_, x_path, y_intent_ = batch[index]
+# 			print(x_)
+
+# 			x.append(torch.tensor(x_).float())
+# 			y_intent.append(torch.tensor(y_intent_).long())
+# 			x_paths.append(x_path)
+		
+# 		# pad all sequences to have same length
+# 		if not self.seq2seq:
+# 			T = max([len(x_) for x_ in x])
+# 			for index in range(batch_size):
+# 				x_pad_length = (T - len(x[index]))
+# 				x[index] = torch.nn.functional.pad(x[index], (0,x_pad_length))
+
+# 			x = torch.stack(x)
+# 			y_intent = torch.stack(y_intent)
+
+# 			return (x,x_paths,y_intent)
+
+# 		else: # seq2seq
+# 			T = max([len(x_) for x_ in x])
+# 			U = max([len(y_intent_) for y_intent_ in y_intent])
+# 			for index in range(batch_size):
+# 				x_pad_length = (T - len(x[index]))
+# 				x[index] = torch.nn.functional.pad(x[index], (0,x_pad_length))
+# 				y_pad_length = (U - len(y_intent[index]))
+# 				y_intent[index] = torch.nn.functional.pad(y_intent[index], (0,y_pad_length), value=self.EOS)
+
+# 			x = torch.stack(x)
+# 			y_intent = torch.stack(y_intent)
+# 			y_intent = one_hot(y_intent, self.num_labels)
+
+# 			return (x,x_paths,y_intent) # Added support for returning audio paths
 
 def get_ASR_datasets(config):
 	"""

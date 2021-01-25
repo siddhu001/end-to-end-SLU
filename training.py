@@ -83,6 +83,7 @@ class Trainer:
 			self.epoch += 1
 			return train_phone_acc, train_phone_loss, train_word_acc, train_word_loss
 		else: # SLUDataset
+			
 			train_intent_acc = 0
 			train_intent_loss = 0
 			num_examples = 0
@@ -314,7 +315,7 @@ class Trainer:
 		self.log(results, log_file)
 		return test_intent_acc, test_intent_loss
 
-	def get_error(self, dataset, error_path=None): # Code to generate csv file containing error cases for model
+	def get_error(self, dataset, error_path=None, nlu_setup = False): # Code to generate csv file containing error cases for model
 		if isinstance(dataset, ASRDataset):
 			test_phone_acc = 0
 			test_phone_loss = 0
@@ -348,10 +349,15 @@ class Trainer:
 			self.model.eval()
 			self.model.cpu(); self.model.is_cuda = False # beam search is memory-intensive; do on CPU for now
 			for idx, batch in enumerate(dataset.loader):
+				
 				x,x_path, y_intent = batch
 				batch_size = len(x)
 				num_examples += batch_size
-				predicted_intent,y_intent,intent_loss, intent_acc = self.model.test(x,y_intent)
+				embed_layer = None
+				if nlu_setup:
+					embed_layer=torch.nn.Embedding(self.config.vocabulary_size+1,self.model.pretrained_model.word_linear.weight.data.shape[1])
+					embed_layer.weight.data[:self.config.vocabulary_size]=self.model.pretrained_model.word_linear.weight.data.clone()
+				predicted_intent,y_intent,intent_loss, intent_acc = self.model.test(x,y_intent, nlu_setup, embed_layer)
 				test_intent_loss += intent_loss.cpu().data.numpy().item() * batch_size
 				test_intent_acc += intent_acc.cpu().data.numpy().item() * batch_size
 				if self.model.seq2seq and self.epoch > 1:
