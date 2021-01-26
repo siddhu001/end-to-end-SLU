@@ -1014,7 +1014,7 @@ class Model(torch.nn.Module):
 		final_words_normalised_weight=final_words_normalised_weight.reshape(x_words_old_shape[0],x_words_old_shape[1], 1, k)
 		return final_words, final_words_normalised_weight
 
-	def test(self, x, y_intent, nlu_setup = False, embed_layer = None, semantic_only = False): # code to return error cases for trained model
+	def test(self, x, y_intent, nlu_setup = False, embed_layer = None): # code to return error cases for trained model
 		"""
 		x : Tensor of shape (batch size, T)
 		y_intent : LongTensor of shape (batch size, num_slots)
@@ -1024,11 +1024,12 @@ class Model(torch.nn.Module):
 		if not nlu_setup:
 			
 			out = self.pretrained_model.compute_features(x)
-		else:
+		if nlu_setup and not self.use_semantic_embeddings:
 			assert embed_layer is not None
 			out = embed_layer(x.long())
 		
 		if self.use_semantic_embeddings:
+			print("use semantic embeddings")
 			if self.smooth_semantic:
 				
 				x_words, x_weight = self.get_top_words( x, k=self.smooth_semantic_parameter)
@@ -1038,6 +1039,7 @@ class Model(torch.nn.Module):
 				if not nlu_setup:
 					x_words = self.get_words(x) # get words predicted by ASR
 				else:
+					print("get gold transcript words")
 					x_words = x.long()
 				word_emb=self.semantic_embeddings(x_words)
 			out = torch.cat((out,word_emb),dim=-1)
