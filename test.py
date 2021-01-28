@@ -19,6 +19,7 @@ if __name__ == '__main__':
 	parser.add_argument('--smooth_semantic', action='store_true', help='sum semantic embedding of top k words')
 	parser.add_argument('--smooth_semantic_parameter', type=str, default="5",help='value of k in smooth_smantic')
 	parser.add_argument('--nlu_setup', action='store_true', help='use Gold utterances to run an NLU test pipeline')
+	parser.add_argument('--asr_setup', action='store_true', help='use Gold utterances to run an ASR test pipeline')
 	parser.add_argument('--single_label', action='store_true',help='Whether our dataset contains a single intent label (or a full triple). Only applied for the FSC dataset.')
 	
 	args = parser.parse_args()
@@ -31,6 +32,7 @@ if __name__ == '__main__':
 	smooth_semantic = args.smooth_semantic
 	smooth_semantic_parameter = int(args.smooth_semantic_parameter)
 	nlu_setup = args.nlu_setup
+	asr_setup = args.asr_setup
 	single_intent = args.single_label
 
 	# Read config file
@@ -45,7 +47,7 @@ if __name__ == '__main__':
 		use_all_gold=True
 
 	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config, disjoint_split=disjoint_split, 
-	use_all_gold = use_all_gold, use_gold_utterances = use_gold_utterances, single_label=single_intent)
+	use_all_gold = use_all_gold, use_gold_utterances = use_gold_utterances, single_label=single_intent, asr_setup = asr_setup)
 
 	# Initialize model
 	if use_FastText_embeddings:
@@ -63,8 +65,16 @@ if __name__ == '__main__':
 	trainer = Trainer(model=model, config=config)
 	if restart: trainer.load_checkpoint(model_path)
 	# Create csv file containing errors made by model
+	if not asr_setup:
+		test_intent_acc, test_intent_loss = trainer.get_error(test_dataset, error_path=args.error_path, nlu_setup = nlu_setup)
+		print("========= Test results =========")
+		print("*intents*| test accuracy: %.2f| test loss: %.2f\n" % (test_intent_acc, test_intent_loss) )
+	else:
+		# note, error path not logging errors yet 
+		test_wer = trainer.get_asr_error(test_dataset, error_path=args.error_path)
+		print("========= Test results =========")
+		print("Average WER (weighted by length) : {:.2f}".format(test_wer))
 
-	test_intent_acc, test_intent_loss = trainer.get_error(test_dataset, error_path=args.error_path, nlu_setup = nlu_setup)
-	print("========= Test results =========")
-	print("*intents*| test accuracy: %.2f| test loss: %.2f\n" % (test_intent_acc, test_intent_loss) )
+		
+	
 

@@ -137,7 +137,8 @@ def read_config(config_file):
 
 	return config
 
-def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False, single_label=True, use_all_gold = False):
+def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False, single_label=True, 
+use_all_gold = False, asr_setup = False):
 	"""
 	config: Config object (contains info about model and training)
 	"""
@@ -260,32 +261,32 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 		config.num_phonemes = len(Sy_phoneme)
 	else:
 		print("No phoneme file found.")
-
+	
+	Sy_word = None
 	# Create dataset objects
-	if use_gold_utterances: # Created support for training intent model on gold utterances
+	if use_gold_utterances or asr_setup: # Created support for training intent model on gold utterances
 		Sy_word = []
 		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 			for line in f.readlines():
 				Sy_word.append(line.rstrip("\n"))
-		train_dataset = SLU_GoldDataset(train_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+		if not asr_setup:
+			train_dataset = SLU_GoldDataset(train_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+		else:
+			train_dataset = SLUDataset(train_df, base_path, Sy_intent, config, words_out = asr_setup, Sy_word = Sy_word)
+		
 	else:
 		train_dataset = SLUDataset(train_df, base_path, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
-	if not use_all_gold:
-		valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config)
-		test_dataset = SLUDataset(test_df, base_path, Sy_intent, config)
+	
+	if not use_all_gold or asr_setup:
+		
+		
+		valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config, words_out = asr_setup, Sy_word = Sy_word)
+		test_dataset = SLUDataset(test_df, base_path, Sy_intent, config, words_out = asr_setup, Sy_word = Sy_word)
 	else:
 		
 		valid_dataset = SLU_GoldDataset(valid_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
 		test_dataset = SLU_GoldDataset(test_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
-	#valid_dataset = SLU_GoldDataset(valid_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
-	#test_dataset = SLU_GoldDataset(test_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
-	# else:
-	# 	Sy_word = []
-	# 	with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
-	# 		for line in f.readlines():
-	# 			Sy_word.append(line.rstrip("\n"))
-	# 	valid_dataset = SLU_GoldDataset(valid_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
-	# 	test_dataset = SLU_GoldDataset(test_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+	
 
 	return train_dataset, valid_dataset, test_dataset
 
@@ -294,7 +295,7 @@ def rms_energy(x):
 	return 10*np.log10((1e-12 + x.dot(x))/len(x))
 
 class SLUDataset(torch.utils.data.Dataset):
-	def __init__(self, df, base_path, Sy_intent, config, upsample_factor=1):
+	def __init__(self, df, base_path, Sy_intent, config, upsample_factor=1, words_out = False, Sy_word = None):
 		"""
 		df:
 		Sy_intent: Dictionary (transcript --> slot values)
@@ -309,7 +310,12 @@ class SLUDataset(torch.utils.data.Dataset):
 		self.seq2seq = config.seq2seq
 		self.config = config
 
-		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU(self.Sy_intent, self.seq2seq))
+		self.words_out = words_out
+		if self.words_out:
+			assert Sy_word is not None
+		self.Sy_word = Sy_word
+
+		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU(self.Sy_intent, self.seq2seq, pad_all=words_out))
 
 	def __len__(self):
 		#if self.augment: return len(self.df)*2 # second half of dataset is augmented
@@ -323,6 +329,9 @@ class SLUDataset(torch.utils.data.Dataset):
 		wav_path = os.path.join(self.base_path, self.df.loc[idx].path)
 		effect = torchaudio.sox_effects.SoxEffectsChain()
 		effect.set_input_file(wav_path)
+		if self.words_out:
+			x_utterance = self.df.loc[idx].transcription.split(" ")
+			y_words=[self.Sy_word.index(k.lower().strip(punctuation)) if k.lower().strip(punctuation) in self.Sy_word else self.config.vocabulary_size for k in x_utterance]
 
 		augment = False
 		if augment:
@@ -368,16 +377,19 @@ class SLUDataset(torch.utils.data.Dataset):
 
 		if not self.seq2seq:
 			y_intent = [] 
-			for slot in self.config.slots:
-				value = self.df.loc[idx][slot]
-				y_intent.append(self.Sy_intent[slot][value])
+			if not self.words_out:
+				for slot in self.config.slots:
+					value = self.df.loc[idx][slot]
+					y_intent.append(self.Sy_intent[slot][value])
+			else:
+				y_intent = y_words
+
 		else:
 			# need sos, eos
 			y_intent = [self.Sy_intent.index("<sos>")]
 			y_intent += [self.Sy_intent.index(c) for c in self.df.loc[idx]["semantics"]]
 			y_intent.append(self.Sy_intent.index("<eos>"))
-
-		return (x, self.df.loc[idx].path, y_intent) # Return audio path - useful for error analysis 
+		return (x, self.df.loc[idx].path, y_intent)
 
 # Class to load data used to train intent model on gold set utterances
 class SLU_GoldDataset(torch.utils.data.Dataset):
@@ -441,10 +453,11 @@ def one_hot(letters, S):
 	return out
 
 class CollateWavsSLU:
-	def __init__(self, Sy_intent, seq2seq):
+	def __init__(self, Sy_intent, seq2seq, pad_all = False):
 		self.Sy_intent = Sy_intent
 		self.num_labels = len(self.Sy_intent)
 		self.seq2seq = seq2seq
+		self.pad_all = pad_all
 		if self.seq2seq:
 			self.EOS = self.Sy_intent.index("<eos>")
 
@@ -467,10 +480,23 @@ class CollateWavsSLU:
 		
 		# pad all sequences to have same length
 		if not self.seq2seq:
-			T = max([len(x_) for x_ in x])
-			for index in range(batch_size):
-				x_pad_length = (T - len(x[index]))
-				x[index] = torch.nn.functional.pad(x[index], (0,x_pad_length))
+			to_pad = {'x' : x}
+			padded = {}
+			if self.pad_all:
+				to_pad['y']= y_intent
+			else:
+				padded['y']=y_intent
+			
+			for val_name, val in to_pad.items():
+				T = max([len(x_) for x_ in val])
+			
+
+				for index in range(batch_size):
+					x_pad_length = (T - len(val[index]))
+					val[index] = torch.nn.functional.pad(val[index], (0,x_pad_length))
+					padded[val_name] = val
+			x = padded['x']
+			y_intent = padded['y']
 
 			x = torch.stack(x)
 			y_intent = torch.stack(y_intent)

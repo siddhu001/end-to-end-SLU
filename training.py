@@ -5,6 +5,7 @@ import os
 from data import SLUDataset, ASRDataset
 from models import PretrainedModel, Model
 import pandas as pd
+from jiwer import wer
 
 class Trainer:
 	def __init__(self, model, config):
@@ -220,7 +221,7 @@ class Trainer:
 		return train_intent_acc, train_intent_loss
 
 	def test(self, dataset, log_file="log.csv"):
-		if isinstance(dataset, ASRDataset):
+		if isinstance(dataset, ASRDataset) or asr_setup:
 			test_phone_acc = 0
 			test_phone_loss = 0
 			test_word_acc = 0
@@ -315,6 +316,65 @@ class Trainer:
 		self.log(results, log_file)
 		return test_intent_acc, test_intent_loss
 
+	def get_asr_error(self, dataset, error_path=None):
+		# for asr testing setup
+		# dataset 'y_intent' is really the gold transcript words 
+		num_examples = 0
+		self.model.eval()
+		self.model.cpu(); self.model.is_cuda = False # beam search is memory-intensive; do on CPU for now
+		wers = []
+		lengths = []
+		true_ = []
+		pred_ = []
+		Sy_word = []
+		paths = []
+		with open(os.path.join(self.config.folder, "pretraining", "words.txt"), "r") as f:
+			for line in f.readlines():
+				Sy_word.append(line.rstrip("\n"))
+		Sy_word.append('<UNK>')
+		for idx, batch in enumerate(dataset.loader):
+				
+			x,x_path, y_word = batch
+			batch_size = len(x)
+			num_examples += batch_size
+			
+			x_words = self.model.test(x,y_word, asr_setup=True)
+			for i in range(batch_size):
+				unpadded = {}
+				for lbl, val in zip(['pred', 'true'], [x_words[i].flatten(), y_word[i].flatten()]):
+					val = val[np.nonzero(val.numpy())]
+					
+					
+					unpadded[lbl] = [Sy_word[int(v)] for v in val]
+				pred = unpadded['pred']
+				true = unpadded['true']
+				
+				
+				paths.append(x_path[i])
+
+				pred_str = " ".join(pred)
+				true_str = " ".join(true)
+
+				true_.append(true_str)
+				pred_.append(pred_str)
+
+				score = wer(true_str, pred_str)
+				wers.append(score)
+				lengths.append(len(true))
+		if error_path is not None:
+			errors = pd.DataFrame(data = {'audio_path':paths, 'predicted': pred_, 'ground_truth': true_, 'wer': wers})
+			errors.to_csv(error_path,index=False)
+		wers = np.asarray(wers)
+		wers = wers.reshape(1, len(wers))
+		lengths = np.asarray(lengths)
+		weights = lengths / np.sum(lengths)
+		weights = weights.reshape(len(weights), 1)
+		avg_wer = float(np.matmul(wers,weights).flatten())
+		self.log({"wer": avg_wer})
+		
+		
+		return avg_wer
+
 	def get_error(self, dataset, error_path=None, nlu_setup = False): # Code to generate csv file containing error cases for model
 		if isinstance(dataset, ASRDataset):
 			test_phone_acc = 0
@@ -336,7 +396,7 @@ class Trainer:
 			test_phone_acc /= num_examples
 			test_word_loss /= num_examples
 			test_word_acc /= num_examples
-			results = {"phone_loss" : test_phone_loss, "phone_acc" : test_phone_acc, "word_loss" : test_word_loss, "word_acc" : test_word_acc,"set": "valid"}
+			results = {"phone_loss" : test_phone_loss, "phone_acc" : test_phone_acc, "word_loss" : test_word_loss, "word_acc" : test_word_acc,"set": split}
 			self.log(results)
 			return test_phone_acc, test_phone_loss, test_word_acc, test_word_loss 
 		else:
@@ -357,7 +417,7 @@ class Trainer:
 				if nlu_setup:
 					embed_layer=torch.nn.Embedding(self.config.vocabulary_size+1,self.model.pretrained_model.word_linear.weight.data.shape[1])
 					embed_layer.weight.data[:self.config.vocabulary_size]=self.model.pretrained_model.word_linear.weight.data.clone()
-				predicted_intent,y_intent,intent_loss, intent_acc = self.model.test(x,y_intent, nlu_setup, embed_layer)
+				predicted_intent,y_intent,intent_loss, intent_acc = self.model.test(x,y_intent, nlu_setup, embed_layer, asr_setup=asr_setup)
 				test_intent_loss += intent_loss.cpu().data.numpy().item() * batch_size
 				test_intent_acc += intent_acc.cpu().data.numpy().item() * batch_size
 				if self.model.seq2seq and self.epoch > 1:
