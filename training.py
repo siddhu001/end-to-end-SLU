@@ -417,7 +417,7 @@ class Trainer:
 				if nlu_setup:
 					embed_layer=torch.nn.Embedding(self.config.vocabulary_size+1,self.model.pretrained_model.word_linear.weight.data.shape[1])
 					embed_layer.weight.data[:self.config.vocabulary_size]=self.model.pretrained_model.word_linear.weight.data.clone()
-				predicted_intent,y_intent,intent_loss, intent_acc = self.model.test(x,y_intent, nlu_setup, embed_layer, asr_setup=asr_setup)
+				predicted_intent,y_intent,intent_loss, intent_acc = self.model.test(x,y_intent, nlu_setup, embed_layer)
 				test_intent_loss += intent_loss.cpu().data.numpy().item() * batch_size
 				test_intent_acc += intent_acc.cpu().data.numpy().item() * batch_size
 				if self.model.seq2seq and self.epoch > 1:
