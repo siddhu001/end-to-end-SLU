@@ -275,12 +275,17 @@ if pipeline_train: # Train model in pipeline manner
 
 if pipeline_gold_train: # Train model in pipeline manner by using gold set utterances
 	# Generate datasets
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label,use_all_gold=True)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label,utterance_closed_with_utility=utterance_closed_with_utility_split,use_all_gold=True)
 
+	print(valid_dataset)
+	print(test_dataset)
 	# Initialize final model
 	if use_semantic_embeddings:
 		glove_embeddings=obtain_glove_embeddings(semantic_embeddings_path, train_dataset.Sy_word )
 		model = Model(config=config,pipeline=True, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings)
+	elif use_FastText_embeddings: # Load FastText embedding
+		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, train_dataset.Sy_word)
+		model = Model(config=config,pipeline=True, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300)
 	else:
 		model = Model(config=config,pipeline=True, use_semantic_embeddings = False)
 
@@ -317,7 +322,7 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 	for epoch in range(config.training_num_epochs): # Train intent model on gold set utterances
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		train_intent_acc, train_intent_loss = trainer.pipeline_train_decoder(train_dataset,gold=True,log_file=log_file)
-		valid_intent_acc, valid_intent_loss = trainer.pipeline_test_decoder(valid_dataset, postprocess_words,log_file=log_file)
+		valid_intent_acc, valid_intent_loss = trainer.pipeline_test_decoder(valid_dataset,gold=True, log_file=log_file)
 
 		print("========= Results: epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
