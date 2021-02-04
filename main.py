@@ -287,16 +287,16 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 			for line in f.readlines():
 				Sy_word.append(line.rstrip("\n"))
 		glove_embeddings=obtain_glove_embeddings(semantic_embeddings_path, Sy_word )
-		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
+		model = Model(config=config,pipeline=True, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
 	elif use_FastText_embeddings: # Load FastText embedding
 		Sy_word = []
 		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 			for line in f.readlines():
 				Sy_word.append(line.rstrip("\n"))
 		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
-		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
+		model = Model(config=config,pipeline=True, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
 	else:
-		model = Model(config=config)
+		model = Model(config=config,pipeline=True)
 
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
@@ -343,7 +343,7 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 		best_model_path=only_model_path + "_best.pth"
 		best_valid_acc=0.0
 
-	for epoch in range(config.training_num_epochs): # Train intent model on gold set utterances
+	for epoch in range(2): # Train intent model on gold set utterances
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		train_intent_acc, train_intent_loss = trainer.pipeline_train_decoder(train_dataset,gold=True,log_file=log_file)
 		valid_intent_acc, valid_intent_loss = trainer.pipeline_test_decoder(valid_dataset,gold=True, log_file=log_file)
