@@ -275,19 +275,28 @@ if pipeline_train: # Train model in pipeline manner
 
 if pipeline_gold_train: # Train model in pipeline manner by using gold set utterances
 	# Generate datasets
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label,utterance_closed_with_utility=utterance_closed_with_utility_split,use_all_gold=True)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label,use_all_gold=True,\
+	utterance_closed = utterance_closed_split, utterance_closed_with_utility=utterance_closed_with_utility_split)
 
 	print(valid_dataset)
 	print(test_dataset)
 	# Initialize final model
-	if use_semantic_embeddings:
-		glove_embeddings=obtain_glove_embeddings(semantic_embeddings_path, train_dataset.Sy_word )
-		model = Model(config=config,pipeline=True, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings)
+	if use_semantic_embeddings: # Load Glove embedding
+		Sy_word = []
+		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
+			for line in f.readlines():
+				Sy_word.append(line.rstrip("\n"))
+		glove_embeddings=obtain_glove_embeddings(semantic_embeddings_path, Sy_word )
+		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
 	elif use_FastText_embeddings: # Load FastText embedding
-		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, train_dataset.Sy_word)
-		model = Model(config=config,pipeline=True, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300)
+		Sy_word = []
+		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
+			for line in f.readlines():
+				Sy_word.append(line.rstrip("\n"))
+		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
+		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
 	else:
-		model = Model(config=config,pipeline=True, use_semantic_embeddings = False)
+		model = Model(config=config)
 
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
@@ -310,10 +319,21 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 		only_model_path=only_model_path + "_random"
 		with_model_path=with_model_path + "_random"
 
+	elif utterance_closed_split:
+		log_file = log_file+ "_utterance_closed"
+		model_path = model_path+  "_utterance_closed"
+	elif utterance_closed_with_utility_split:
+		log_file = log_file+ "_utterance_closed_with_utility"
+		model_path = model_path+  "_utterance_closed_with_utility"
+
+	
+
 	if use_semantic_embeddings:
 		log_file=log_file+"_glove"
-		only_model_path=only_model_path + "_glove"
-		with_model_path=with_model_path + "_glove"
+		model_path=model_path + "_glove"
+	elif use_FastText_embeddings:
+		log_file=log_file+"_FastText"
+		model_path=model_path + "_FastText"
 
 	log_file=log_file+".csv"
 	only_model_path=only_model_path + ".pth"
