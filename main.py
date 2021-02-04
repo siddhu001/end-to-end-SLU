@@ -319,6 +319,10 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 	only_model_path=only_model_path + ".pth"
 	with_model_path=with_model_path + ".pth"
 
+	if save_best_model:
+		best_model_path=only_model_path + "_best.pth"
+		best_valid_acc=0.0
+
 	for epoch in range(config.training_num_epochs): # Train intent model on gold set utterances
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		train_intent_acc, train_intent_loss = trainer.pipeline_train_decoder(train_dataset,gold=True,log_file=log_file)
@@ -327,6 +331,11 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 		print("========= Results: epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
 		trainer.save_checkpoint(model_path=only_model_path)
+		if save_best_model: # Save best model observed till now
+			if (valid_intent_acc>best_valid_acc):
+				best_valid_acc=valid_intent_acc
+				best_valid_loss=valid_intent_loss
+				trainer.save_checkpoint(model_path=best_model_path)
 	
 	# train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split)
 	# for epoch in range(config.training_num_epochs): # Train intent model on predicted utterances
@@ -338,6 +347,12 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 	# 	print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
 	# 	trainer.save_checkpoint(model_path=with_model_path)
 
-	# test_intent_acc, test_intent_loss = trainer.pipeline_test_decoder(test_dataset, postprocess_words, log_file=log_file)
-	# print("========= Test results =========")
-	# print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
+	test_intent_acc, test_intent_loss = trainer.pipeline_test_decoder(test_dataset, gold=True, log_file=log_file)
+	print("========= Test results =========")
+	print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
+	if save_best_model:
+		trainer.load_checkpoint(model_path=best_model_path) # Compute performance of best model on test set
+		test_intent_acc, test_intent_loss = trainer.pipeline_test_decoder(test_dataset, gold=True, log_file=log_file)
+		print("========= Test results =========")
+		print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
+
