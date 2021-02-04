@@ -321,19 +321,19 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 
 	elif utterance_closed_split:
 		log_file = log_file+ "_utterance_closed"
-		model_path = model_path+  "_utterance_closed"
+		only_model_path = only_model_path+  "_utterance_closed"
 	elif utterance_closed_with_utility_split:
 		log_file = log_file+ "_utterance_closed_with_utility"
-		model_path = model_path+  "_utterance_closed_with_utility"
+		only_model_path = only_model_path+  "_utterance_closed_with_utility"
 
 	
 
 	if use_semantic_embeddings:
 		log_file=log_file+"_glove"
-		model_path=model_path + "_glove"
+		only_model_path=only_model_path + "_glove"
 	elif use_FastText_embeddings:
 		log_file=log_file+"_FastText"
-		model_path=model_path + "_FastText"
+		only_model_path=only_model_path + "_FastText"
 
 	log_file=log_file+".csv"
 	only_model_path=only_model_path + ".pth"
