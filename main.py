@@ -22,6 +22,8 @@ parser.add_argument('--finetune_embedding', action='store_true', help='tune SLU 
 parser.add_argument('--finetune_semantics_embedding', action='store_true', help='tune semantics embeddings')
 parser.add_argument('--random_split', action='store_true', help='randomly split dataset')
 parser.add_argument('--disjoint_split', action='store_true', help='split dataset with disjoint utterances in train set and test set')
+parser.add_argument('--utterance_closed_split', action='store_true', help='load closed utterance train/val/test')
+parser.add_argument('--utterance_closed_with_utility_split', action='store_true', help='load closed utterance (utility) train/val/test')
 parser.add_argument('--restart', action='store_true', help='load checkpoint from a previous run')
 parser.add_argument('--config_path', type=str, help='path to config file with hyperparameters, etc.')
 parser.add_argument('--pipeline_gold_train', action='store_true', help='run SLU training in pipeline manner with gold set utterances')
@@ -30,10 +32,11 @@ parser.add_argument('--save_best_model', action='store_true', help='save the mod
 parser.add_argument('--smooth_semantic', action='store_true', help='sum semantic embedding of top k words')
 parser.add_argument('--smooth_semantic_parameter', type=str, default="5",help='value of k in smooth_smantic')
 parser.add_argument('--single_label', action='store_true',help='Whether our dataset contains a single intent label (or a full triple). Only applied for the FSC dataset.')
-
+parser.add_argument('--nlu_setup', action='store_true', help='use Gold utterances to run an NLU test pipeline')
 
 args = parser.parse_args()
 pretrain = args.pretrain
+
 train = args.train
 pipeline_train = args.pipeline_train
 pipeline_gold_train = args.pipeline_gold_train
@@ -48,12 +51,16 @@ finetune_embedding = args.finetune_embedding
 finetune_semantics_embedding = args.finetune_semantics_embedding
 random_split = args.random_split
 disjoint_split = args.disjoint_split
+utterance_closed_split = args.utterance_closed_split
+utterance_closed_with_utility_split = args.utterance_closed_with_utility_split
 save_best_model = args.save_best_model
 seperate_RNN = args.seperate_RNN
 smooth_semantic = args.smooth_semantic
 smooth_semantic_parameter = int(args.smooth_semantic_parameter)
 
 single_label = args.single_label
+nlu_setup = args.nlu_setup 
+
 
 # Read config file
 config = read_config(config_path)
@@ -96,6 +103,17 @@ if train:
 	elif random_split:
 		log_file=log_file+"_random"
 		model_path=model_path + "_random"
+	elif random_split:
+		log_file=log_file+"_random"
+		model_path=model_path + "_random"
+	elif utterance_closed_split:
+		log_file = log_file+ "_utterance_closed"
+		model_path = model_path+  "_utterance_closed"
+	elif utterance_closed_with_utility_split:
+		log_file = log_file+ "_utterance_closed_with_utility"
+		model_path = model_path+  "_utterance_closed_with_utility"
+
+	
 
 	if use_semantic_embeddings:
 		log_file=log_file+"_glove"
@@ -124,7 +142,15 @@ if train:
 	model_path=model_path + ".pth"
 
 	# Generate datasets
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label)
+	use_gold_utterances = False
+	use_all_gold=False
+	if nlu_setup:
+		# make sure to load up word transcripts for train, val, AND test sets
+		use_gold_utterances = True
+		use_all_gold=True
+
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label,\
+	 use_all_gold = use_all_gold, use_gold_utterances = use_gold_utterances, utterance_closed = utterance_closed_split, utterance_closed_with_utility=utterance_closed_with_utility_split)
 
 	# Initialize final model
 	if use_semantic_embeddings: # Load Glove embedding

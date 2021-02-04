@@ -16,6 +16,8 @@ if __name__ == '__main__':
 	parser.add_argument('--use_FastText_embeddings', action='store_true', help='use FastText embeddings')
 	parser.add_argument('--semantic_embeddings_path', type=str, help='path for semantic embeddings')
 	parser.add_argument('--disjoint_split', action='store_true', help='split dataset with disjoint utterances in train set and test set')
+	parser.add_argument('--utterance_closed_split', action='store_true', help='load closed utterance train/val/test')
+	parser.add_argument('--utterance_closed_with_utility_split', action='store_true', help='load closed utterance (utility) train/val/test')
 	parser.add_argument('--smooth_semantic', action='store_true', help='sum semantic embedding of top k words')
 	parser.add_argument('--smooth_semantic_parameter', type=str, default="5",help='value of k in smooth_smantic')
 	parser.add_argument('--nlu_setup', action='store_true', help='use Gold utterances to run an NLU test pipeline')
@@ -29,6 +31,8 @@ if __name__ == '__main__':
 	use_FastText_embeddings = args.use_FastText_embeddings
 	semantic_embeddings_path = args.semantic_embeddings_path
 	disjoint_split = args.disjoint_split
+	utterance_closed_split = args.utterance_closed_split
+	utterance_closed_with_utility_split = args.utterance_closed_with_utility_split
 	smooth_semantic = args.smooth_semantic
 	smooth_semantic_parameter = int(args.smooth_semantic_parameter)
 	nlu_setup = args.nlu_setup
@@ -46,8 +50,8 @@ if __name__ == '__main__':
 		use_gold_utterances = True
 		use_all_gold=True
 
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config, disjoint_split=disjoint_split, 
-	use_all_gold = use_all_gold, use_gold_utterances = use_gold_utterances, single_label=single_intent, asr_setup = asr_setup)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config, disjoint_split=disjoint_split, utterance_closed = utterance_closed_split,\
+	utterance_closed_with_utility=utterance_closed_with_utility_split, use_all_gold = use_all_gold, use_gold_utterances = use_gold_utterances, single_label=single_intent, asr_setup = asr_setup)
 
 	# Initialize model
 	if use_FastText_embeddings:

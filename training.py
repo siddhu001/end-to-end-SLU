@@ -220,7 +220,7 @@ class Trainer:
 		self.epoch += 1
 		return train_intent_acc, train_intent_loss
 
-	def test(self, dataset, log_file="log.csv"):
+	def test(self, dataset, log_file="log.csv", asr_setup=False):
 		if isinstance(dataset, ASRDataset) or asr_setup:
 			test_phone_acc = 0
 			test_phone_loss = 0

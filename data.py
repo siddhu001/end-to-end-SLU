@@ -137,7 +137,7 @@ def read_config(config_file):
 
 	return config
 
-def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False, single_label=True, 
+def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False, utterance_closed = False, utterance_closed_with_utility = False,single_label=True, 
 use_all_gold = False, asr_setup = False):
 	"""
 	config: Config object (contains info about model and training)
@@ -153,6 +153,11 @@ use_all_gold = False, asr_setup = False):
 			real_train_df = pd.read_csv(os.path.join(base_path, "data/zeroshot_splits", "train_data.csv"))
 		elif single_label:
 			real_train_df = pd.read_csv(os.path.join(base_path, "data/single_label", "train_data.csv"))
+		elif utterance_closed:
+			real_train_df = pd.read_csv(os.path.join(base_path, "data/utterance_closed_splits", "train_data.csv"))
+		elif utterance_closed_with_utility:
+			real_train_df = pd.read_csv(os.path.join(base_path, "data/utterance_closed_splits_utility", "train_data.csv"))
+		
 		else:
 			real_train_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "train_data.csv"))
 		if "\"Unnamed: 0\"" in list(real_train_df): real_train_df = real_train_df.drop(columns="Unnamed: 0")
@@ -205,6 +210,12 @@ use_all_gold = False, asr_setup = False):
 		elif single_label:
 			valid_df = pd.read_csv(os.path.join(base_path, "data/single_label", "valid_data.csv"))
 			test_df = pd.read_csv(os.path.join(base_path, "data/single_label", "test_data.csv"))
+		elif utterance_closed:
+			valid_df = pd.read_csv(os.path.join(base_path, "data/utterance_closed_splits", "valid_data.csv"))
+			test_df = pd.read_csv(os.path.join(base_path, "data/utterance_closed_splits", "test_data.csv"))
+		elif utterance_closed_with_utility:
+			valid_df = pd.read_csv(os.path.join(base_path, "data/utterance_closed_splits_utility", "valid_data.csv"))
+			test_df = pd.read_csv(os.path.join(base_path, "data/utterance_closed_splits_utility", "test_data.csv"))
 		else:
 			valid_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "valid_data.csv"))
 			test_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "test_data.csv"))
