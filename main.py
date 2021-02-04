@@ -322,9 +322,11 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 	elif utterance_closed_split:
 		log_file = log_file+ "_utterance_closed"
 		only_model_path = only_model_path+  "_utterance_closed"
+		ith_model_path=with_model_path +"_utterance_closed"
 	elif utterance_closed_with_utility_split:
 		log_file = log_file+ "_utterance_closed_with_utility"
 		only_model_path = only_model_path+  "_utterance_closed_with_utility"
+		with_model_path=with_model_path + "_utterance_closed_with_utility"
 
 	
 
