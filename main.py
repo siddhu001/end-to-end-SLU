@@ -343,7 +343,7 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 		best_model_path=only_model_path + "_best.pth"
 		best_valid_acc=0.0
 
-	for epoch in range(2): # Train intent model on gold set utterances
+	for epoch in range(config.training_num_epochs): # Train intent model on gold set utterances
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		train_intent_acc, train_intent_loss = trainer.pipeline_train_decoder(train_dataset,gold=True,log_file=log_file)
 		valid_intent_acc, valid_intent_loss = trainer.pipeline_test_decoder(valid_dataset,gold=True, log_file=log_file)
