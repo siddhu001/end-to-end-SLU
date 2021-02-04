@@ -272,7 +272,7 @@ class Trainer:
 			self.log(results, log_file)
 			return test_intent_acc, test_intent_loss 
 	
-	def pipeline_test_decoder(self, dataset, postprocess_words=False, log_file="log.csv"): #Code to test model in pipeline manner
+	def pipeline_test_decoder(self, dataset, postprocess_words=False,gold=False, log_file="log.csv"): #Code to test model in pipeline manner
 		test_intent_acc = 0
 		test_intent_loss = 0
 		num_examples = 0
@@ -282,22 +282,27 @@ class Trainer:
 			x,x_path, y_intent = batch
 			batch_size = len(x)
 			num_examples += batch_size
-			x_words = self.model.get_words(x)
-			if postprocess_words:
-				x_words_new=[]
-				for j in x_words:
-					cur_list=[]
-					prev_k=0
-					for k in j:
-						if k==0:
-							continue
-						if k==prev_k:
-							continue
-						cur_list.append(k)
-						prev_k=k
-					cur_list=cur_list+([0]*(len(j)-len(cur_list)))
-					x_words_new.append(cur_list)
-				x_words=torch.LongTensor(x_words_new)
+			if gold: # Use gold set utterances
+				x_words=x.type(torch.LongTensor)
+			else:
+				x_words = self.model.get_words(x) # Use utterances predicted by ASR
+				if postprocess_words:
+					x_words_new=[]
+					for j in x_words:
+						cur_list=[]
+						prev_k=0
+						for k in j:
+							if k==0:
+								continue
+							if k==prev_k:
+								continue
+							cur_list.append(k)
+							prev_k=k
+						cur_list=cur_list+([0]*(len(j)-len(cur_list)))
+						x_words_new.append(cur_list)
+					x_words=torch.LongTensor(x_words_new)
+					if torch.cuda.is_available():
+						x_words = x_words.cuda()
 			intent_loss, intent_acc = self.model.run_pipeline(x_words,y_intent)
 			test_intent_loss += intent_loss.cpu().data.numpy().item() * batch_size
 			test_intent_acc += intent_acc.cpu().data.numpy().item() * batch_size
