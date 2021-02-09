@@ -707,7 +707,7 @@ class Model(torch.nn.Module):
 	"""
 	End-to-end SLU model.
 	"""
-	def __init__(self, config, pipeline=False,finetune=False,use_semantic_embeddings = False, glove_embeddings=None,glove_emb_dim=100, finetune_semantic_embeddings = False, seperate_RNN=False, smooth_semantic= False, smooth_semantic_parameter= 1):
+	def __init__(self, config, pipeline=False,finetune=False,use_semantic_embeddings = False, glove_embeddings=None,glove_emb_dim=100, finetune_semantic_embeddings = False, seperate_RNN=False, smooth_semantic= False, smooth_semantic_parameter= 1, combine_lamp_and_lights=False):
 		super(Model, self).__init__()
 		self.is_cuda = torch.cuda.is_available()
 		self.Sy_intent = config.Sy_intent
@@ -828,6 +828,10 @@ class Model(torch.nn.Module):
 			self.num_labels = len(config.Sy_intent) 
 			self.encoder = Seq2SeqEncoder(out_dim, config.num_intent_encoder_layers, config.intent_encoder_dim)
 			self.decoder = Seq2SeqDecoder(self.num_labels, config.num_intent_decoder_layers, config.intent_encoder_dim, config.intent_decoder_dim, config.intent_decoder_key_dim, config.intent_decoder_value_dim, self.SOS)
+
+		# Whether to make objects "lamp" and "lights" map to the same object ("lights") at test time.
+		# Needed for testing on Snips, where there is no distinction between lamp and lights.
+		self._combine_lamp_and_lights = combine_lamp_and_lights
 
 		if self.is_cuda:
 			self.cuda()
@@ -1046,6 +1050,11 @@ class Model(torch.nn.Module):
 				predicted_intent.append(subset.max(1)[1])
 				start_idx = end_idx
 			predicted_intent = torch.stack(predicted_intent, dim=1)
+			if self._combine_lamp_and_lights:
+				# Convert "lights" intent to "lamp"
+				breakpoint()
+				raise NotImplementedError
+				predicted_intent = None
 			intent_acc = (predicted_intent == y_intent).prod(1).float().mean() # all slots must be correct
 
 			return predicted_intent,y_intent,intent_loss, intent_acc # return both predicted as well as gold intent

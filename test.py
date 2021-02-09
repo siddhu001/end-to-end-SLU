@@ -44,7 +44,13 @@ if use_FastText_embeddings:
 		for line in f.readlines():
 			Sy_word.append(line.rstrip("\n"))
 	FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
-	model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
+	model = Model(config=config,
+				  pipeline=False,
+				  use_semantic_embeddings=use_FastText_embeddings,
+				  glove_embeddings=FastText_embeddings,glove_emb_dim=300,
+				  smooth_semantic= smooth_semantic,
+				  smooth_semantic_parameter= smooth_semantic_parameter,
+				  )
 else:
 	model = Model(config=config)
 

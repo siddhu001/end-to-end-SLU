@@ -96,6 +96,7 @@ def read_config(config_file):
 
 	#[training]
 	config.slu_path=parser.get("training", "slu_path")
+	config.snips_path=parser.get("training", "snips_path")
 	config.unfreezing_type=int(parser.get("training", "unfreezing_type"))
 	config.training_lr=float(parser.get("training", "training_lr"))
 	config.training_batch_size=int(parser.get("training", "training_batch_size"))
@@ -137,11 +138,12 @@ def read_config(config_file):
 
 	return config
 
-def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False, single_label=True):
+def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False, single_label=True, snips_test_set=True, snips_type="close_field"):
 	"""
 	config: Config object (contains info about model and training)
 	"""
 	base_path = config.slu_path
+	snips_base_path = config.snips_path
 
 	# Split - Added support for random split and disjoint split
 	if not config.seq2seq:
@@ -207,6 +209,9 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 		else:
 			valid_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "valid_data.csv"))
 			test_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "test_data.csv"))
+		if snips_test_set:
+			test_df = pd.read_csv(os.path.join(snips_base_path, "test_data.csv"))
+
 	else:
 		valid_df = pd.read_csv(os.path.join(base_path, "data", "valid_data_seq2seq.csv"))
 		test_df = pd.read_csv(os.path.join(base_path, "data", "test_data_seq2seq.csv"))
