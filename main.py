@@ -126,7 +126,9 @@ if train:
 			fraction_string = str(int(training_percentage))
 		else:
 			fraction_string = str(round(training_percentage, 3))
-		model_path=model_path + "_" + fraction_string.replace(".", "_") + "_pct"
+		fraction_string = "_" + fraction_string.replace(".", "_") + "_pct"
+		model_path=model_path + fraction_string
+		log_file=log_file + fraction_string
 
 	if save_best_model:
 		best_model_path=model_path + "_best.pth"
