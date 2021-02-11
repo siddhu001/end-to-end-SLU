@@ -18,6 +18,7 @@ parser.add_argument('--semantic_embeddings_path', type=str, help='path for seman
 parser.add_argument('--disjoint_split', action='store_true', help='split dataset with disjoint utterances in train set and test set')
 parser.add_argument('--smooth_semantic', action='store_true', help='sum semantic embedding of top k words')
 parser.add_argument('--smooth_semantic_parameter', type=str, default="5",help='value of k in smooth_smantic')
+parser.add_argument('--snips_test_set', action='store_true',help='Whether to evaluate on Snips only.')
 
 args = parser.parse_args()
 restart = args.restart
@@ -28,13 +29,14 @@ semantic_embeddings_path = args.semantic_embeddings_path
 disjoint_split = args.disjoint_split
 smooth_semantic = args.smooth_semantic
 smooth_semantic_parameter = int(args.smooth_semantic_parameter)
+snips_test_set = args.snips_test_set
 
 # Read config file
 config = read_config(config_path)
 torch.manual_seed(config.seed); np.random.seed(config.seed)
 
 # Generate datasets
-train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config, disjoint_split=disjoint_split)
+train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config, disjoint_split=disjoint_split, snips_test_set=snips_test_set)
 
 # Initialize model
 if use_FastText_embeddings:
@@ -50,9 +52,10 @@ if use_FastText_embeddings:
 				  glove_embeddings=FastText_embeddings,glove_emb_dim=300,
 				  smooth_semantic= smooth_semantic,
 				  smooth_semantic_parameter= smooth_semantic_parameter,
+				  sanitize_predictions_for_snips=snips_test_set
 				  )
 else:
-	model = Model(config=config)
+	model = Model(config=config, sanitize_predictions_for_snips=snips_test_set)
 
 # Load the trained model
 trainer = Trainer(model=model, config=config)

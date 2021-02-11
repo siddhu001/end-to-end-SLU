@@ -31,6 +31,7 @@ parser.add_argument('--smooth_semantic', action='store_true', help='sum semantic
 parser.add_argument('--smooth_semantic_parameter', type=str, default="5",help='value of k in smooth_smantic')
 parser.add_argument('--single_label', action='store_true',help='Whether our dataset contains a single intent label (or a full triple). Only applied for the FSC dataset.')
 parser.add_argument('--snips_test_set', action='store_true',help='Whether to evaluate on Snips only.')
+parser.add_argument('--training_fraction', type=float, help='If true, only train on the requested amount of training data.')
 
 
 args = parser.parse_args()
@@ -56,6 +57,7 @@ smooth_semantic_parameter = int(args.smooth_semantic_parameter)
 
 single_label = args.single_label
 snips_test_set = args.snips_test_set
+training_fraction = args.training_fraction
 
 # Read config file
 config = read_config(config_path)
@@ -118,6 +120,14 @@ if train:
 		log_file=log_file+"_finetune_semantic"
 		model_path=model_path + "_finetune_semantic"
 
+	if training_fraction:
+		training_percentage = training_fraction * 100
+		if training_percentage == int(training_percentage):
+			fraction_string = str(int(training_percentage))
+		else:
+			fraction_string = str(round(training_percentage, 3))
+		model_path=model_path + "_" + fraction_string.replace(".", "_") + "_pct"
+
 	if save_best_model:
 		best_model_path=model_path + "_best.pth"
 		best_valid_acc=0.0
@@ -126,7 +136,7 @@ if train:
 	model_path=model_path + ".pth"
 
 	# Generate datasets
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label, snips_test_set=snips_test_set)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label, snips_test_set=snips_test_set, downsample_train_factor=training_fraction)
 
 	# Initialize final model
 	if use_semantic_embeddings: # Load Glove embedding
@@ -135,16 +145,16 @@ if train:
 			for line in f.readlines():
 				Sy_word.append(line.rstrip("\n"))
 		glove_embeddings=obtain_glove_embeddings(semantic_embeddings_path, Sy_word )
-		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter, combine_lamp_and_lights=snips_test_set)
+		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter, sanitize_predictions_for_snips=snips_test_set)
 	elif use_FastText_embeddings: # Load FastText embedding
 		Sy_word = []
 		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 			for line in f.readlines():
 				Sy_word.append(line.rstrip("\n"))
 		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
-		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter, combine_lamp_and_lights=snips_test_set)
+		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter, sanitize_predictions_for_snips=snips_test_set)
 	else:
-		model = Model(config=config, combine_lamp_and_lights=snips_test_set)
+		model = Model(config=config, sanitize_predictions_for_snips=snips_test_set)
 
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
@@ -185,10 +195,10 @@ if get_words: # Generate predict utterances by ASR module
 	# Initialize final model
 	if use_FastText_embeddings: # Load FastText embeddings
 		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
-		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, combine_lamp_and_lights=snips_test_set)
+		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, combine_lamp_and_lights=snips_test_set, sanitize_predictions_for_snips=snips_test_set)
 
 	else:
-		model = Model(config=config, combine_lamp_and_lights=snips_test_set)
+		model = Model(config=config, combine_lamp_and_lights=snips_test_set, sanitize_predictions_for_snips=snips_test_set)
 
 	# Load pretrained model
 	trainer = Trainer(model=model, config=config)
@@ -223,7 +233,7 @@ if pipeline_train: # Train model in pipeline manner
 			log_file="log_pipeline.csv"
 	
 	# Initialize final model
-	model = Model(config=config,pipeline=True,finetune=finetune_embedding, combine_lamp_and_lights=snips_test_set)
+	model = Model(config=config,pipeline=True,finetune=finetune_embedding, sanitize_predictions_for_snips=snips_test_set)
 
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
@@ -255,9 +265,9 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 	# Initialize final model
 	if use_semantic_embeddings:
 		glove_embeddings=obtain_glove_embeddings(semantic_embeddings_path, train_dataset.Sy_word )
-		model = Model(config=config,pipeline=True, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings, combine_lamp_and_lights=snips_test_set)
+		model = Model(config=config,pipeline=True, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings, sanitize_predictions_for_snips=snips_test_set)
 	else:
-		model = Model(config=config,pipeline=True, use_semantic_embeddings = False, combine_lamp_and_lights=snips_test_set)
+		model = Model(config=config,pipeline=True, use_semantic_embeddings = False, sanitize_predictions_for_snips=snips_test_set)
 
 	# Train the final model
 	trainer = Trainer(model=model, config=config)

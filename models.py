@@ -707,7 +707,7 @@ class Model(torch.nn.Module):
 	"""
 	End-to-end SLU model.
 	"""
-	def __init__(self, config, pipeline=False,finetune=False,use_semantic_embeddings = False, glove_embeddings=None,glove_emb_dim=100, finetune_semantic_embeddings = False, seperate_RNN=False, smooth_semantic= False, smooth_semantic_parameter= 1, combine_lamp_and_lights=False):
+	def __init__(self, config, pipeline=False,finetune=False,use_semantic_embeddings = False, glove_embeddings=None,glove_emb_dim=100, finetune_semantic_embeddings = False, seperate_RNN=False, smooth_semantic= False, smooth_semantic_parameter= 1, sanitize_predictions_for_snips=False):
 		super(Model, self).__init__()
 		self.is_cuda = torch.cuda.is_available()
 		self.Sy_intent = config.Sy_intent
@@ -831,7 +831,7 @@ class Model(torch.nn.Module):
 
 		# Whether to make objects "lamp" and "lights" map to the same object ("lights") at test time.
 		# Needed for testing on Snips, where there is no distinction between lamp and lights.
-		self._combine_lamp_and_lights = combine_lamp_and_lights
+		self._sanitize_predictions_for_snips = sanitize_predictions_for_snips
 
 		if self.is_cuda:
 			self.cuda()
@@ -1050,11 +1050,15 @@ class Model(torch.nn.Module):
 				predicted_intent.append(subset.max(1)[1])
 				start_idx = end_idx
 			predicted_intent = torch.stack(predicted_intent, dim=1)
-			if self._combine_lamp_and_lights:
+			if self._sanitize_predictions_for_snips:
+				# Set location to be None for all predictions, since Snips does not have
+				# this slot.
+				predicted_intent[:, 2]=0
 				# Convert "lights" intent to "lamp"
-				breakpoint()
-				raise NotImplementedError
-				predicted_intent = None
+				lamp_object_index = self.Sy_intent["object"]["lamp"]
+				lights_object_index = self.Sy_intent["object"]["lights"]
+				predicted_intent[:, 1][predicted_intent[:, 1] == lamp_object_index]=lights_object_index
+
 			intent_acc = (predicted_intent == y_intent).prod(1).float().mean() # all slots must be correct
 
 			return predicted_intent,y_intent,intent_loss, intent_acc # return both predicted as well as gold intent

@@ -138,7 +138,7 @@ def read_config(config_file):
 
 	return config
 
-def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False, single_label=True, snips_test_set=True, snips_type="close_field"):
+def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False, single_label=False, snips_test_set=False, snips_type="close_field", downsample_train_factor=None):
 	"""
 	config: Config object (contains info about model and training)
 	"""
@@ -211,7 +211,6 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 			test_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "test_data.csv"))
 		if snips_test_set:
 			test_df = pd.read_csv(os.path.join(snips_base_path, "test_data.csv"))
-
 	else:
 		valid_df = pd.read_csv(os.path.join(base_path, "data", "valid_data_seq2seq.csv"))
 		test_df = pd.read_csv(os.path.join(base_path, "data", "test_data_seq2seq.csv"))
@@ -228,6 +227,7 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 			for idx,value in enumerate(slot_values):
 				Sy_intent[slot][value] = idx
 			values_per_slot.append(len(slot_values))
+
 		print(f"Saved slot-name-to-index mapping to intent_mapping.json") # Saved slot-name-to-index mapping
 		json.dump(Sy_intent, open("intent_mapping.json", 'w'))
 		config.values_per_slot = values_per_slot
@@ -274,10 +274,10 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 				Sy_word.append(line.rstrip("\n"))
 		train_dataset = SLU_GoldDataset(train_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
 	else:
-		train_dataset = SLUDataset(train_df, base_path, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+		train_dataset = SLUDataset(train_df, base_path, Sy_intent, config,upsample_factor=config.dataset_upsample_factor, downsample_factor=downsample_train_factor)
+
 	valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config)
 	test_dataset = SLUDataset(test_df, base_path, Sy_intent, config)
-
 	return train_dataset, valid_dataset, test_dataset
 
 # taken from https://github.com/jfsantos/maracas/blob/master/maracas/maracas.py
@@ -285,7 +285,7 @@ def rms_energy(x):
 	return 10*np.log10((1e-12 + x.dot(x))/len(x))
 
 class SLUDataset(torch.utils.data.Dataset):
-	def __init__(self, df, base_path, Sy_intent, config, upsample_factor=1):
+	def __init__(self, df, base_path, Sy_intent, config, upsample_factor=1, downsample_factor=None):
 		"""
 		df:
 		Sy_intent: Dictionary (transcript --> slot values)
@@ -299,12 +299,16 @@ class SLUDataset(torch.utils.data.Dataset):
 		self.SNRs = [0,5,10,15,20]
 		self.seq2seq = config.seq2seq
 		self.config = config
+		self.downsample_factor = downsample_factor
 
 		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU(self.Sy_intent, self.seq2seq))
 
 	def __len__(self):
 		#if self.augment: return len(self.df)*2 # second half of dataset is augmented
-		return len(self.df) * self.upsample_factor
+		if self.downsample_factor is not None:
+			return int(len(self.df) * self.downsample_factor)
+		else:
+			return len(self.df) * self.upsample_factor
 
 	def __getitem__(self, idx):
 		#augment = ((idx / len(self.df)) > 1) and self.augment
