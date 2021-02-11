@@ -130,7 +130,7 @@ def read_config(config_file):
 
 	return config
 
-def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False):
+def get_SLU_datasets(config,data_str,split_style,use_gold_utterances=False):
 	"""
 	config: Config object (contains info about model and training)
 	"""
@@ -139,12 +139,7 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 	# Split - Added support for random split and disjoint split
 	if not config.seq2seq:
 		synthetic_train_df = pd.read_csv(os.path.join(base_path, "data", "synthetic_data.csv"))
-		if random_split:
-			real_train_df = pd.read_csv(os.path.join(base_path, "data/random_splits", "train_data.csv"))
-		elif disjoint_split:
-			real_train_df = pd.read_csv(os.path.join(base_path, "data/zeroshot_splits", "train_data.csv"))
-		else:
-			real_train_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "train_data.csv"))
+		real_train_df = pd.read_csv(os.path.join(base_path, "data/"+data_str, "train_data.csv"))
 		if "\"Unnamed: 0\"" in list(real_train_df): real_train_df = real_train_df.drop(columns="Unnamed: 0")
 	else:
 		synthetic_train_df = pd.read_csv(os.path.join(base_path, "data", "synthetic_data_seq2seq.csv"))
@@ -186,15 +181,13 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 
 	train_df = pd.concat([synthetic_train_df, real_train_df]).reset_index()
 	if not config.seq2seq: # Read valid and test set - Added support for random split and disjoint split
-		if random_split: 
-			valid_df = pd.read_csv(os.path.join(base_path, "data/random_splits", "valid_data.csv"))
-			test_df = pd.read_csv(os.path.join(base_path, "data/random_splits", "test_data.csv"))
-		elif disjoint_split:
-			valid_df = pd.read_csv(os.path.join(base_path, "data/zeroshot_splits", "valid_data.csv"))
-			test_df = pd.read_csv(os.path.join(base_path, "data/zeroshot_splits", "test_data.csv"))
-		else:
-			valid_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "valid_data.csv"))
-			test_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "test_data.csv"))
+		if split_style=="speaker_or_utterance_closed":
+			valid_df = pd.read_csv(os.path.join(base_path, "data/"+data_str, "valid_data.csv"))
+			test_closed_utterance_df = pd.read_csv(os.path.join(base_path, "data/"+data_str, "closed_utterance_test_data.csv"))
+			test_closed_speaker_df = pd.read_csv(os.path.join(base_path, "data/"+data_str, "closed_speaker_test_data.csv"))
+		else: 
+			valid_df = pd.read_csv(os.path.join(base_path, "data/"+data_str, "valid_data.csv"))
+			test_df = pd.read_csv(os.path.join(base_path, "data/"+data_str, "test_data.csv"))
 	else:
 		valid_df = pd.read_csv(os.path.join(base_path, "data", "valid_data_seq2seq.csv"))
 		test_df = pd.read_csv(os.path.join(base_path, "data", "test_data_seq2seq.csv"))
@@ -257,7 +250,12 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 	else:
 		train_dataset = SLUDataset(train_df, base_path, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
 	valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config)
-	test_dataset = SLUDataset(test_df, base_path, Sy_intent, config)
+	if split_style=="speaker_or_utterance_closed":
+		test_closed_utterance_dataset = SLUDataset(test_closed_utterance_df, base_path, Sy_intent, config)
+		test_closed_speaker_dataset = SLUDataset(test_closed_speaker_df, base_path, Sy_intent, config)
+		return train_dataset, valid_dataset, test_closed_utterance_dataset, test_closed_speaker_dataset
+	else:
+		test_dataset = SLUDataset(test_df, base_path, Sy_intent, config)
 
 	return train_dataset, valid_dataset, test_dataset
 

@@ -20,8 +20,8 @@ parser.add_argument('--use_FastText_embeddings', action='store_true', help='use 
 parser.add_argument('--semantic_embeddings_path', type=str, help='path for semantic embeddings')
 parser.add_argument('--finetune_embedding', action='store_true', help='tune SLU embeddings')
 parser.add_argument('--finetune_semantics_embedding', action='store_true', help='tune semantics embeddings')
-parser.add_argument('--random_split', action='store_true', help='randomly split dataset')
-parser.add_argument('--disjoint_split', action='store_true', help='split dataset with disjoint utterances in train set and test set')
+parser.add_argument('--resplit_style', required=True, choices=['original','random', 'utterance_closed', "speaker_or_utterance_closed", "mutually_closed"], help='Path to root of fluent_speech_commands_dataset directory')
+parser.add_argument('--utility', action='store_true', help='Use utility driven splits')
 parser.add_argument('--restart', action='store_true', help='load checkpoint from a previous run')
 parser.add_argument('--config_path', type=str, help='path to config file with hyperparameters, etc.')
 parser.add_argument('--pipeline_gold_train', action='store_true', help='run SLU training in pipeline manner with gold set utterances')
@@ -29,6 +29,8 @@ parser.add_argument('--seperate_RNN', action='store_true', help='run seperate RN
 parser.add_argument('--save_best_model', action='store_true', help='save the model with best performance on validation set')
 parser.add_argument('--smooth_semantic', action='store_true', help='sum semantic embedding of top k words')
 parser.add_argument('--smooth_semantic_parameter', type=str, default="5",help='value of k in smooth_smantic')
+parser.add_argument('--complete', action='store_true', help='get over complete dataset')
+parser.add_argument('--KL_divergence', action='store_true', help='run over closed speaker dataset')
 
 args = parser.parse_args()
 pretrain = args.pretrain
@@ -44,12 +46,22 @@ use_FastText_embeddings = args.use_FastText_embeddings
 semantic_embeddings_path = args.semantic_embeddings_path
 finetune_embedding = args.finetune_embedding
 finetune_semantics_embedding = args.finetune_semantics_embedding
-random_split = args.random_split
-disjoint_split = args.disjoint_split
 save_best_model = args.save_best_model
 seperate_RNN = args.seperate_RNN
 smooth_semantic = args.smooth_semantic
 smooth_semantic_parameter = int(args.smooth_semantic_parameter)
+resplit_style = args.resplit_style
+utility = args.utility
+complete = args.complete
+KL_divergence = args.KL_divergence
+
+data_str=f"{resplit_style}_splits"
+
+if utility:
+	data_str=data_str+"_utility"
+
+if KL_divergence:
+	data_str=data_str+"_KL_divergence"
 
 # Read config file
 config = read_config(config_path)
@@ -86,12 +98,13 @@ if train:
 	if postprocess_words:
 		log_file=log_file+"_postprocess"
 		model_path=model_path + "_postprocess"
-	if disjoint_split:
-		log_file=log_file+"_disjoint"
-		model_path=model_path + "_disjoint"
-	elif random_split:
-		log_file=log_file+"_random"
-		model_path=model_path + "_random"
+
+	log_file=log_file+"_"+f"{resplit_style}"
+	model_path=model_path+"_"+f"{resplit_style}"
+
+	if utility:
+		log_file=log_file+"_utility"
+		model_path=model_path + "_utility"
 
 	if use_semantic_embeddings:
 		log_file=log_file+"_glove"
@@ -112,6 +125,10 @@ if train:
 		log_file=log_file+"_finetune_semantic"
 		model_path=model_path + "_finetune_semantic"
 
+	if KL_divergence:
+		log_file=log_file+"_KL_divergence"
+		model_path=model_path + "_KL_divergence"
+
 	if save_best_model:
 		best_model_path=model_path + "_best.pth"
 		best_valid_acc=0.0
@@ -120,7 +137,10 @@ if train:
 	model_path=model_path + ".pth"
 
 	# Generate datasets
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split)
+	if resplit_style=="speaker_or_utterance_closed":
+		train_dataset, valid_dataset, test_closed_utterance_dataset, test_closed_speaker_dataset = get_SLU_datasets(config,data_str=data_str,split_style=resplit_style)
+	else:
+		train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,data_str=data_str,split_style=resplit_style)
 
 	# Initialize final model
 	if use_semantic_embeddings: # Load Glove embedding
@@ -143,7 +163,7 @@ if train:
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
 	if restart: trainer.load_checkpoint()
-		
+	# config.training_num_epochs
 	for epoch in range(config.training_num_epochs):
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		train_intent_acc, train_intent_loss = trainer.train(train_dataset,log_file=log_file)
@@ -159,14 +179,26 @@ if train:
 				best_valid_loss=valid_intent_loss
 				trainer.save_checkpoint(model_path=best_model_path)		
 
-	test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
-	print("========= Test results =========")
-	print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
-	if save_best_model:
-		trainer.load_checkpoint(model_path=best_model_path) # Compute performance of best model on test set
+	if resplit_style=="speaker_or_utterance_closed":
+		test_utterance_intent_acc, test_utterance_intent_loss = trainer.test(test_closed_utterance_dataset,log_file=log_file)
+		test_speaker_intent_acc, test_speaker_intent_loss = trainer.test(test_closed_speaker_dataset,log_file=log_file)
+		print("========= Test results =========")
+		print("*intents*| test speaker accuracy: %.2f| test speaker loss: %.2f| test utterance accuracy: %.2f| test utterance loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_speaker_intent_acc, test_speaker_intent_loss,test_utterance_intent_acc, test_utterance_intent_loss, valid_intent_acc, valid_intent_loss) )
+	else:
 		test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
 		print("========= Test results =========")
-		print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
+		print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
+	if save_best_model:
+		trainer.load_checkpoint(model_path=best_model_path) # Compute performance of best model on test set
+		if resplit_style=="speaker_or_utterance_closed":
+			test_utterance_intent_acc, test_utterance_intent_loss = trainer.test(test_closed_utterance_dataset,log_file=log_file)
+			test_speaker_intent_acc, test_speaker_intent_loss = trainer.test(test_closed_speaker_dataset,log_file=log_file)
+			print("========= Test results =========")
+			print("*intents*| test speaker accuracy: %.2f| test speaker loss: %.2f| test utterance accuracy: %.2f| test utterance loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_speaker_intent_acc, test_speaker_intent_loss,test_utterance_intent_acc, test_utterance_intent_loss, valid_intent_acc, valid_intent_loss) )
+		else:
+			test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
+			print("========= Test results =========")
+			print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
 
 if get_words: # Generate predict utterances by ASR module
 	# Generate datasets
@@ -174,7 +206,7 @@ if get_words: # Generate predict utterances by ASR module
 	with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 		for line in f.readlines():
 			Sy_word.append(line.rstrip("\n"))
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,disjoint_split=disjoint_split)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,data_str=data_str,split_style=resplit_style)
 
 	# Initialize final model
 	if use_FastText_embeddings: # Load FastText embeddings
@@ -186,17 +218,25 @@ if get_words: # Generate predict utterances by ASR module
 
 	# Load pretrained model
 	trainer = Trainer(model=model, config=config)
-	if use_FastText_embeddings and smooth_semantic:
-		trainer.load_checkpoint("model_state_disjoint_FastText_smooth_10_finetune_semantic_best.pth")
-	elif use_FastText_embeddings and disjoint_split:
-		trainer.load_checkpoint("model_state_disjoint_FastText_finetune_semantic_best.pth")
-	elif disjoint_split:
-		trainer.load_checkpoint("model_state_disjoint_best.pth")
-	elif use_FastText_embeddings:
-		trainer.load_checkpoint("model_state_FastText.pth")
+	if restart:
+		if use_FastText_embeddings and smooth_semantic:
+			trainer.load_checkpoint("model_state_disjoint_FastText_smooth_10_finetune_semantic_best.pth")
+		elif use_FastText_embeddings and resplit_style=="utterance_closed":
+			trainer.load_checkpoint("model_state_disjoint_FastText_finetune_semantic_best.pth")
+		elif resplit_style=="utterance_closed":
+			trainer.load_checkpoint("model_state_disjoint_best.pth")
+		elif use_FastText_embeddings:
+			trainer.load_checkpoint("model_state_FastText.pth")
 
 	# get words from pretrained model
-	predicted_words, audio_paths = trainer.get_word_SLU(test_dataset,Sy_word, postprocess_words, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
+	if complete:
+		train_predicted_words, train_audio_paths = trainer.get_word_SLU(train_dataset,Sy_word, postprocess_words, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
+		valid_predicted_words, valid_audio_paths = trainer.get_word_SLU(valid_dataset,Sy_word, postprocess_words, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
+		test_predicted_words, test_audio_paths = trainer.get_word_SLU(test_dataset,Sy_word, postprocess_words, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
+		predicted_words=np.concatenate([train_predicted_words, valid_predicted_words, test_predicted_words], axis=0)
+		audio_paths=np.concatenate([train_audio_paths, valid_audio_paths, test_audio_paths], axis=0)
+	else:
+		predicted_words, audio_paths = trainer.get_word_SLU(test_dataset,Sy_word, postprocess_words, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
 	df=pd.DataFrame({'audio path': audio_paths, 'predicted_words': predicted_words}) # Save predicted utterances
 	df.to_csv(args.save_words_path, index=False)
 
@@ -244,7 +284,7 @@ if pipeline_train: # Train model in pipeline manner
 
 if pipeline_gold_train: # Train model in pipeline manner by using gold set utterances
 	# Generate datasets
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,random_split=random_split, disjoint_split=disjoint_split)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,data_str=data_str,split_style=resplit_style)
 
 	# Initialize final model
 	if use_semantic_embeddings:
@@ -265,14 +305,8 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 		log_file=log_file+"_postprocess"
 		only_model_path=only_model_path + "_postprocess"
 		with_model_path=with_model_path + "_postprocess"
-	if disjoint_split:
-		log_file=log_file+"_disjoint"
-		only_model_path=only_model_path + "_disjoint"
-		with_model_path=with_model_path + "_disjoint"
-	elif random_split:
-		log_file=log_file+"_random"
-		only_model_path=only_model_path + "_random"
-		with_model_path=with_model_path + "_random"
+	log_file=log_file+"_"+f"{resplit_style}"
+	model_path=model_path+"_"+f"{resplit_style}"
 
 	if use_semantic_embeddings:
 		log_file=log_file+"_glove"
@@ -292,7 +326,7 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
 		trainer.save_checkpoint(model_path=only_model_path)
 	
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,data_str=data_str,split_style=resplit_style)
 	for epoch in range(config.training_num_epochs): # Train intent model on predicted utterances
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		train_intent_acc, train_intent_loss = trainer.pipeline_train_decoder(train_dataset, postprocess_words,log_file=log_file)
