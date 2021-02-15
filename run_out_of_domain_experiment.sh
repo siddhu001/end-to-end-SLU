@@ -11,8 +11,9 @@ training_frac_str=( 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 
 
 printf "###########\nTraining and testing on original splits\n####\n"
 # Training and testing on original splits.
-for i in {0..$max_iter}
+for ((i=0; i<=$max_iter; i++))
 do
+    echo "i: ${i}"
     training_frac=${training_fractions[i]}
     training_frac_str=${training_frac_str[i]}
 
@@ -36,7 +37,7 @@ done
 
 printf "\n\n\n####\nTraining and testing on speaker-or-utterance-closed splits\n####\n"
 # Training on speaker-or-utterance-closed splits, and testing on speaker-closed test split.
-for i in {0..$max_iter}
+for ((i=0; i<=$max_iter; i++))
 do
     training_frac=${training_fractions[i]}
     training_frac_str=${training_frac_str[i]}
@@ -69,3 +70,5 @@ do
 
     printf "\n"
 done
+
+printf "###########\nDone."
