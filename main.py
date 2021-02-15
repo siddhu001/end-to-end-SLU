@@ -21,6 +21,7 @@ parser.add_argument('--semantic_embeddings_path', type=str, help='path for seman
 parser.add_argument('--finetune_embedding', action='store_true', help='tune SLU embeddings')
 parser.add_argument('--finetune_semantics_embedding', action='store_true', help='tune semantics embeddings')
 parser.add_argument('--random_split', action='store_true', help='randomly split dataset')
+parser.add_argument('--speaker_or_utterance_closed_split', action='store_true', help='speaker-or-utterance dataset (using the speaker-closed test set as the default test set)')
 parser.add_argument('--disjoint_split', action='store_true', help='split dataset with disjoint utterances in train set and test set')
 parser.add_argument('--restart', action='store_true', help='load checkpoint from a previous run')
 parser.add_argument('--config_path', type=str, help='path to config file with hyperparameters, etc.')
@@ -49,6 +50,7 @@ semantic_embeddings_path = args.semantic_embeddings_path
 finetune_embedding = args.finetune_embedding
 finetune_semantics_embedding = args.finetune_semantics_embedding
 random_split = args.random_split
+speaker_or_utterance_closed_split = args.speaker_or_utterance_closed_split
 disjoint_split = args.disjoint_split
 save_best_model = args.save_best_model
 seperate_RNN = args.seperate_RNN
@@ -97,6 +99,9 @@ if train:
 	if disjoint_split:
 		log_file=log_file+"_disjoint"
 		model_path=model_path + "_disjoint"
+	elif speaker_or_utterance_closed_split:
+		log_file=log_file+"_spk_or_utt_closed_spk_test"
+		model_path=model_path + "_spk_or_utt_closed_spk_test"
 	elif random_split:
 		log_file=log_file+"_random"
 		model_path=model_path + "_random"
@@ -138,7 +143,7 @@ if train:
 	model_path=model_path + ".pth"
 
 	# Generate datasets
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label, snips_test_set=snips_test_set, downsample_train_factor=training_fraction)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label, speaker_or_utterance_closed_speaker_test=speaker_or_utterance_closed_split, snips_test_set=snips_test_set, downsample_train_factor=training_fraction)
 
 	# Initialize final model
 	if use_semantic_embeddings: # Load Glove embedding
@@ -185,6 +190,8 @@ if train:
 		test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
 		print("========= Test results =========")
 		print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
+	print(f"Wrote train log file to {log_file}.")
+
 
 if get_words: # Generate predict utterances by ASR module
 	# Generate datasets
@@ -192,7 +199,7 @@ if get_words: # Generate predict utterances by ASR module
 	with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 		for line in f.readlines():
 			Sy_word.append(line.rstrip("\n"))
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,disjoint_split=disjoint_split, single_label=single_label)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,disjoint_split=disjoint_split, single_label=single_label, speaker_or_utterance_closed_speaker_test=speaker_or_utterance_closed_split)
 
 	# Initialize final model
 	if use_FastText_embeddings: # Load FastText embeddings
@@ -262,7 +269,7 @@ if pipeline_train: # Train model in pipeline manner
 
 if pipeline_gold_train: # Train model in pipeline manner by using gold set utterances
 	# Generate datasets
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label, speaker_or_utterance_closed_speaker_test=speaker_or_utterance_closed_split)
 
 	# Initialize final model
 	if use_semantic_embeddings:
@@ -310,7 +317,11 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
 		trainer.save_checkpoint(model_path=only_model_path)
 	
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split, snips_test_set=snips_test_set)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,
+																  random_split=random_split,
+																  disjoint_split=disjoint_split,
+																  speaker_or_utterance_closed_speaker_test=speaker_or_utterance_closed_split,
+																  snips_test_set=snips_test_set)
 	for epoch in range(config.training_num_epochs): # Train intent model on predicted utterances
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		train_intent_acc, train_intent_loss = trainer.pipeline_train_decoder(train_dataset, postprocess_words,log_file=log_file)

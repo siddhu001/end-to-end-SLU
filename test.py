@@ -18,7 +18,11 @@ parser.add_argument('--semantic_embeddings_path', type=str, help='path for seman
 parser.add_argument('--disjoint_split', action='store_true', help='split dataset with disjoint utterances in train set and test set')
 parser.add_argument('--smooth_semantic', action='store_true', help='sum semantic embedding of top k words')
 parser.add_argument('--smooth_semantic_parameter', type=str, default="5",help='value of k in smooth_smantic')
+parser.add_argument('--speaker_or_utterance_closed_speaker_test', action='store_true', help='use speaker-or-utterance splits (using the speaker-closed test set)')
+parser.add_argument('--speaker_or_utterance_closed_utterance_test', action='store_true', help='use speaker-or-utterance splits (using the utterance-closed test set)')
+parser.add_argument('--utterance_closed_split', action='store_true', help='use speaker-or-utterance splits (using the utterance-closed test set)')
 parser.add_argument('--snips_test_set', action='store_true',help='Whether to evaluate on Snips only.')
+parser.add_argument('--log_file_suffix', type=str, help="Suffix to add to logfile filename")
 
 args = parser.parse_args()
 restart = args.restart
@@ -29,14 +33,20 @@ semantic_embeddings_path = args.semantic_embeddings_path
 disjoint_split = args.disjoint_split
 smooth_semantic = args.smooth_semantic
 smooth_semantic_parameter = int(args.smooth_semantic_parameter)
+speaker_or_utterance_closed_speaker_test = args.speaker_or_utterance_closed_speaker_test
+speaker_or_utterance_closed_utterance_test = args.speaker_or_utterance_closed_utterance_test
+utterance_closed_split = args.utterance_closed_split
 snips_test_set = args.snips_test_set
+log_file_suffix = args.log_file_suffix
+
+log_file = f"log_{log_file_suffix}.csv"
 
 # Read config file
 config = read_config(config_path)
 torch.manual_seed(config.seed); np.random.seed(config.seed)
 
 # Generate datasets
-train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config, disjoint_split=disjoint_split, snips_test_set=snips_test_set)
+train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config, disjoint_split=disjoint_split, snips_test_set=snips_test_set, speaker_or_utterance_closed_speaker_test=speaker_or_utterance_closed_speaker_test, speaker_or_utterance_closed_utterance_test=speaker_or_utterance_closed_utterance_test)
 
 # Initialize model
 if use_FastText_embeddings:
@@ -60,6 +70,8 @@ else:
 # Load the trained model
 trainer = Trainer(model=model, config=config)
 if restart: trainer.load_checkpoint(model_path)
+test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
+print(f"Wrote test log file to {log_file}.")
 # Create csv file containing errors made by model
 test_intent_acc, test_intent_loss = trainer.get_error(test_dataset, error_path=args.error_path)
 print("========= Test results =========")
