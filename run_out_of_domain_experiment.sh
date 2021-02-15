@@ -21,7 +21,7 @@ do
     # Train and test on FSC splits.
     log_suffix=${training_frac_str}_pct
 
-    printf "Generating (training log) log_${log_suffix}.csv"
+    echo "Generating (training log) log_${log_suffix}.csv"
     python main.py --train --config_path=experiments/no_unfreezing.cfg --training_fraction $training_frac
 
 
@@ -35,7 +35,8 @@ do
     printf "\n"
 done
 
-printf "\n\n\n####\nTraining and testing on speaker-or-utterance-closed splits\n####\n"
+printf "\n\n\n########\n"
+printf "####\nTraining and testing on speaker-or-utterance-closed splits\n####\n"
 # Training on speaker-or-utterance-closed splits, and testing on speaker-closed test split.
 for ((i=0; i<=$max_iter; i++))
 do
@@ -46,14 +47,14 @@ do
     # Train and test on FSC splits (testing on speaker-closed split).
     log_suffix=spk_or_utt_closed_spk_test_${training_frac_str}_pct
 
-    printf "Generating (training log) log_${log_suffix}.csv"
+    echo "Generating (training log) log_${log_suffix}.csv"
     python main.py --train --speaker_or_utterance_closed_split --config_path=experiments/no_unfreezing.cfg --training_fraction $training_frac
 
 
     # Test on the FSC utterance-closed test split.
     log_suffix=spk_or_utt_closed_utt_test_${training_frac_str}_pct
 
-    printf "Generating (test log) log_${log_suffix}.csv"
+    echo "Generating (test log) log_${log_suffix}.csv"
     python test.py --restart --model_path model_state_spk_or_utt_closed_${training_frac_str}_pct.pth \
     --speaker_or_utterance_closed_utterance_test --config_path=experiments/no_unfreezing_snips_test.cfg \
     --error_path error_analysis.csv --snips_test_set \
@@ -63,7 +64,7 @@ do
     # Test on the Snips test set.
     log_suffix=spk_or_utt_closed_trained_snips_${training_frac_str}_pct
 
-    printf "Generating (test log) log_${log_suffix}.csv"
+    echo "Generating (test log) log_${log_suffix}.csv"
     python test.py --restart --model_path model_state_spk_or_utt_closed_${training_frac_str}_pct.pth \
     --config_path=experiments/no_unfreezing_snips_test.cfg --error_path error_analysis.csv --snips_test_set \
     --log_file_suffix ${log_suffix}
