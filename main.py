@@ -126,7 +126,7 @@ if train:
 		model_path=model_path + "_finetune_semantic"
 
 	if training_fraction:
-		training_percentage = training_fraction * 100
+		training_percentage = round(training_fraction * 100, 5)
 		if training_percentage == int(training_percentage):
 			fraction_string = str(int(training_percentage))
 		else:
