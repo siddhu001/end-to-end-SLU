@@ -144,6 +144,8 @@ def get_SLU_datasets(config,
 					 disjoint_split=False,
 					 speaker_or_utterance_closed_speaker_test=False,
 					 speaker_or_utterance_closed_utterance_test=False,
+					 speaker_or_utterance_closed_with_utility_speaker_test=False,
+					 speaker_or_utterance_closed_with_utility_utterance_test=False,
 					 single_label=False,
 					 snips_test_set=False,
 					 snips_type="close_field",
@@ -165,6 +167,8 @@ def get_SLU_datasets(config,
 			real_train_df = pd.read_csv(os.path.join(base_path, "data/single_label", "train_data.csv"))
 		elif speaker_or_utterance_closed_speaker_test or speaker_or_utterance_closed_utterance_test:
 			real_train_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits", "train_data.csv"))
+		elif speaker_or_utterance_closed_with_utility_speaker_test or speaker_or_utterance_closed_with_utility_utterance_test:
+			real_train_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "train_data.csv"))
 		else:
 			real_train_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "train_data.csv"))
 		if "\"Unnamed: 0\"" in list(real_train_df): real_train_df = real_train_df.drop(columns="Unnamed: 0")
@@ -223,6 +227,12 @@ def get_SLU_datasets(config,
 				test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits", "closed_speaker_test_data.csv"))
 			else:
 				test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits", "closed_utterance_test_data.csv"))
+		elif speaker_or_utterance_closed_with_utility_speaker_test or speaker_or_utterance_closed_with_utility_utterance_test:
+			valid_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "valid_data.csv"))
+			if speaker_or_utterance_closed_with_utility_speaker_test:
+				test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "closed_speaker_test_data.csv"))
+			else:
+				test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "closed_utterance_test_data.csv"))
 		else:
 			valid_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "valid_data.csv"))
 			test_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "test_data.csv"))

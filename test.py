@@ -20,6 +20,8 @@ parser.add_argument('--smooth_semantic', action='store_true', help='sum semantic
 parser.add_argument('--smooth_semantic_parameter', type=str, default="5",help='value of k in smooth_smantic')
 parser.add_argument('--speaker_or_utterance_closed_speaker_test', action='store_true', help='use speaker-or-utterance splits (using the speaker-closed test set)')
 parser.add_argument('--speaker_or_utterance_closed_utterance_test', action='store_true', help='use speaker-or-utterance splits (using the utterance-closed test set)')
+parser.add_argument('--speaker_or_utterance_closed_with_utility_speaker_test', action='store_true', help='utility-optimized speaker-or-utterance dataset (using the speaker-closed test set)')
+parser.add_argument('--speaker_or_utterance_closed_with_utility_utterance_test', action='store_true', help='utility-optimized speaker-or-utterance dataset (using the utterance-closed test set)')
 parser.add_argument('--utterance_closed_split', action='store_true', help='use speaker-or-utterance splits (using the utterance-closed test set)')
 parser.add_argument('--snips_test_set', action='store_true',help='Whether to evaluate on Snips only.')
 parser.add_argument('--log_file_suffix', type=str, help="Suffix to add to logfile filename")
@@ -35,6 +37,8 @@ smooth_semantic = args.smooth_semantic
 smooth_semantic_parameter = int(args.smooth_semantic_parameter)
 speaker_or_utterance_closed_speaker_test = args.speaker_or_utterance_closed_speaker_test
 speaker_or_utterance_closed_utterance_test = args.speaker_or_utterance_closed_utterance_test
+speaker_or_utterance_closed_with_utility_speaker_test = args.speaker_or_utterance_closed_with_utility_speaker_test
+speaker_or_utterance_closed_with_utility_utterance_test = args.speaker_or_utterance_closed_with_utility_utterance_test
 utterance_closed_split = args.utterance_closed_split
 snips_test_set = args.snips_test_set
 log_file_suffix = args.log_file_suffix
@@ -46,7 +50,13 @@ config = read_config(config_path)
 torch.manual_seed(config.seed); np.random.seed(config.seed)
 
 # Generate datasets
-train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config, disjoint_split=disjoint_split, snips_test_set=snips_test_set, speaker_or_utterance_closed_speaker_test=speaker_or_utterance_closed_speaker_test, speaker_or_utterance_closed_utterance_test=speaker_or_utterance_closed_utterance_test)
+train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,
+															  disjoint_split=disjoint_split,
+															  snips_test_set=snips_test_set,
+															  speaker_or_utterance_closed_speaker_test=speaker_or_utterance_closed_speaker_test,
+															  speaker_or_utterance_closed_utterance_test=speaker_or_utterance_closed_utterance_test,
+															  speaker_or_utterance_closed_with_utility_speaker_test=speaker_or_utterance_closed_with_utility_speaker_test,
+															  speaker_or_utterance_closed_with_utility_utterance_test=speaker_or_utterance_closed_with_utility_utterance_test)
 
 # Initialize model
 if use_FastText_embeddings:
