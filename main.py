@@ -33,6 +33,7 @@ parser.add_argument('--smooth_semantic_parameter', type=str, default="5",help='v
 parser.add_argument('--single_label', action='store_true',help='Whether our dataset contains a single intent label (or a full triple). Only applied for the FSC dataset.')
 parser.add_argument('--snips_test_set', action='store_true',help='Whether to evaluate on Snips only.')
 parser.add_argument('--training_fraction', type=float, help='If true, only train on the requested amount of training data.')
+parser.add_argument('--log_suffix', type=str, help='Additional suffix to add to log files')
 
 
 args = parser.parse_args()
@@ -60,6 +61,7 @@ smooth_semantic_parameter = int(args.smooth_semantic_parameter)
 single_label = args.single_label
 snips_test_set = args.snips_test_set
 training_fraction = args.training_fraction
+log_suffix = args.log_suffix
 
 # Read config file
 config = read_config(config_path)
@@ -92,6 +94,9 @@ if train:
 	# Create corresponding model path based on the implementation
 	log_file="log"
 	model_path="model_state"
+
+	if log_suffix is not None:
+		log_file = log_file + "_" + log_suffix
 
 	if postprocess_words:
 		log_file=log_file+"_postprocess"
