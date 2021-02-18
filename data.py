@@ -283,6 +283,9 @@ def get_SLU_datasets(config,
 	else:
 		print("No phoneme file found.")
 
+	if downsample_train_factor is not None:
+		train_df = train_df.sample(frac=1, random_state=0).reset_index(drop=True)
+
 	# Create dataset objects
 	if use_gold_utterances: # Created support for training intent model on gold utterances
 		Sy_word = []
