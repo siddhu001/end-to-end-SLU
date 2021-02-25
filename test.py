@@ -86,13 +86,12 @@ else:
 # Load the trained model
 trainer = Trainer(model=model, config=config)
 if restart: trainer.load_checkpoint(model_path)
-test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
-print("========= Test results (trainer.test)=========")
-print("*intents*| test accuracy: %.2f| test loss: %.2f\n" % (test_intent_acc, test_intent_loss) )
-
-print(f"Wrote test log file to {log_file}.")
 # Create csv file containing errors made by model
-test_intent_acc, test_intent_loss = trainer.get_error(test_dataset, error_path=args.error_path)
+if snips_test_set:
+	test_intent_acc, test_intent_loss, activate_lights_ap, deactivate_lights_ap = trainer.get_error(test_dataset, error_path=args.error_path, compute_snips_auc_metrics=True, log_file=log_file)
+else:
+	test_intent_acc, test_intent_loss = trainer.get_error(test_dataset, error_path=args.error_path, compute_snips_auc_metrics=False, log_file=log_file)
+print(f"Wrote test log file to {log_file}.")
 print("========= Test results (trainer.get_error) =========")
-print("*intents*| test accuracy: %.2f| test loss: %.2f\n" % (test_intent_acc, test_intent_loss) )
+print("*intents*| test accuracy: %.2f| test loss: %.2f | activate lights AP: %.2f | deactivate lights AP: %.2f\n" % (test_intent_acc, test_intent_loss, activate_lights_ap, deactivate_lights_ap) )
 

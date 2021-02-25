@@ -5,6 +5,7 @@ import os
 from data import SLUDataset, ASRDataset
 from models import PretrainedModel, Model
 import pandas as pd
+from sklearn.metrics import average_precision_score
 
 class Trainer:
 	def __init__(self, model, config):
@@ -314,7 +315,7 @@ class Trainer:
 		self.log(results, log_file)
 		return test_intent_acc, test_intent_loss
 
-	def get_error(self, dataset, error_path=None): # Code to generate csv file containing error cases for model
+	def get_error(self, dataset, compute_snips_auc_metrics=False, error_path=None, log_file=None): # Code to generate csv file containing error cases for model
 		if isinstance(dataset, ASRDataset):
 			test_phone_acc = 0
 			test_phone_loss = 0
@@ -347,11 +348,31 @@ class Trainer:
 			num_examples = 0
 			self.model.eval()
 			self.model.cpu(); self.model.is_cuda = False # beam search is memory-intensive; do on CPU for now
+
+			activate_lights_probabilities = None
+			deactivate_lights_probabilities = None
+			activate_lights_gt = None
+			deactivate_lights_gt = None
 			for idx, batch in enumerate(dataset.loader):
 				x,x_path, y_intent = batch
 				batch_size = len(x)
 				num_examples += batch_size
-				predicted_intent,y_intent,intent_loss, intent_acc = self.model.test(x,y_intent)
+				if compute_snips_auc_metrics:
+					predicted_intent,y_intent,intent_loss, intent_acc, batch_activate_lights_probabilities, batch_deactivate_lights_probabilities, batch_activate_lights_gt, batch_deactivate_lights_gt = self.model.test(x, y_intent, return_full_probabilities=True)
+				else:
+					predicted_intent,y_intent,intent_loss, intent_acc = self.model.test(x, y_intent)
+
+				if activate_lights_probabilities is None:
+					activate_lights_probabilities = batch_activate_lights_probabilities.clone()
+					deactivate_lights_probabilities = batch_deactivate_lights_probabilities.clone()
+					activate_lights_gt = batch_activate_lights_gt.clone()
+					deactivate_lights_gt = batch_deactivate_lights_gt.clone()
+				else:
+					activate_lights_probabilities = torch.cat([activate_lights_probabilities, batch_activate_lights_probabilities], dim=0)
+					deactivate_lights_probabilities = torch.cat([deactivate_lights_probabilities, batch_deactivate_lights_probabilities], dim=0)
+					activate_lights_gt = torch.cat([activate_lights_gt, batch_activate_lights_gt], dim=0)
+					deactivate_lights_gt = torch.cat([deactivate_lights_gt, batch_deactivate_lights_gt], dim=0)
+
 				test_intent_loss += intent_loss.cpu().data.numpy().item() * batch_size
 				test_intent_acc += intent_acc.cpu().data.numpy().item() * batch_size
 				if self.model.seq2seq and self.epoch > 1:
@@ -372,12 +393,30 @@ class Trainer:
 				complete_pred.extend(predicted_intent[match].cpu().numpy())
 				complete_y.extend(y_intent[match].cpu().numpy())
 
+			if compute_snips_auc_metrics:
+				activate_lights_probabilities = activate_lights_probabilities.detach().numpy()
+				deactivate_lights_probabilities = deactivate_lights_probabilities.detach().numpy()
+				activate_lights_gt = activate_lights_gt.detach().numpy()
+				deactivate_lights_gt = deactivate_lights_gt.detach().numpy()
+
+				activate_lights_ap = average_precision_score(activate_lights_gt, activate_lights_probabilities)
+				deactivate_lights_ap = average_precision_score(deactivate_lights_gt, deactivate_lights_probabilities)
+
 			self.model.cuda(); self.model.is_cuda = True
 			test_intent_loss /= num_examples
 			test_intent_acc /= num_examples
 			results = {"intent_loss" : test_intent_loss, "intent_acc" : test_intent_acc, "set": "valid"}
-			self.log(results)
+			if compute_snips_auc_metrics:
+				results["activate_lights_ap"] = activate_lights_ap
+				results["deactivate_lights_ap"] = deactivate_lights_ap
+			if log_file is not None:
+				self.log(results, log_file)
+			else:
+				self.log(results)
 			df=pd.DataFrame({'audio path': complete_path_filter,'prediction': complete_pred,'correct label': complete_y})
 			if error_path is not None:
 				df.to_csv(error_path,index=False)
+
+			if compute_snips_auc_metrics:
+				return test_intent_acc, test_intent_loss, activate_lights_ap, deactivate_lights_ap
 			return test_intent_acc, test_intent_loss 

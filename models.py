@@ -947,11 +947,8 @@ class Model(torch.nn.Module):
 				intent_loss += torch.nn.functional.cross_entropy(subset, y_intent[:, slot])
 				predicted_intent.append(subset.max(1)[1])
 				start_idx = end_idx
-			predicted_intent = torch.stack(predicted_intent, dim=1)
-			if self._sanitize_predictions_for_snips:
-				from IPython import embed; embed(); raise ValueError("!")
-				# TODO(Vijay): implement AUC metrics for Snips
 
+			predicted_intent = torch.stack(predicted_intent, dim=1)
 			intent_acc = (predicted_intent == y_intent).prod(1).float().mean() # all slots must be correct
 
 			return intent_loss, intent_acc
@@ -1021,7 +1018,7 @@ class Model(torch.nn.Module):
 		final_words_normalised_weight=final_words_normalised_weight.reshape(x_words_old_shape[0],x_words_old_shape[1], 1, k)
 		return final_words, final_words_normalised_weight
 
-	def test(self, x, y_intent): # code to return error cases for trained model
+	def test(self, x, y_intent, return_full_probabilities=False): # code to return error cases for trained model
 		"""
 		x : Tensor of shape (batch size, T)
 		y_intent : LongTensor of shape (batch size, num_slots)
@@ -1047,23 +1044,46 @@ class Model(torch.nn.Module):
 			intent_loss = 0.
 			start_idx = 0
 			predicted_intent = []
+			slot_probabilities = []
 			for slot in range(len(self.values_per_slot)):
 				end_idx = start_idx + self.values_per_slot[slot]
 				subset = intent_logits[:, start_idx:end_idx]
 				intent_loss += torch.nn.functional.cross_entropy(subset, y_intent[:, slot])
 				predicted_intent.append(subset.max(1)[1])
 				start_idx = end_idx
+				slot_probabilities.append(torch.nn.functional.softmax(subset, dim=1))
+
+			# We don't care about the location slot.
+			slot_probabilities = slot_probabilities[:2]
+
 			predicted_intent = torch.stack(predicted_intent, dim=1)
+
 			if self._sanitize_predictions_for_snips:
 				# Set location to be None for all predictions, since Snips does not have
 				# this slot.
 				predicted_intent[:, 2]=0
 				# Convert "lights" intent to "lamp"
+				activate_action_index = self.Sy_intent["action"]["activate"]
+				deactivate_action_index = self.Sy_intent["action"]["deactivate"]
 				lamp_object_index = self.Sy_intent["object"]["lamp"]
 				lights_object_index = self.Sy_intent["object"]["lights"]
 				predicted_intent[:, 1][predicted_intent[:, 1] == lamp_object_index]=lights_object_index
 
+				activate_probabilities = slot_probabilities[0][:, activate_action_index]
+				deactivate_probabilities = slot_probabilities[0][:, deactivate_action_index]
+				lights_probabilities = slot_probabilities[1][:, lights_object_index].clone()
+				lamp_probabilities = slot_probabilities[1][:, lamp_object_index]
+				lights_probabilities += lamp_probabilities
+
+				activate_lights_probabilities = activate_probabilities * lights_probabilities
+				activate_lights_gt = y_intent[:, 0] == activate_action_index
+				deactivate_lights_probabilities = deactivate_probabilities * lights_probabilities
+				deactivate_lights_gt = y_intent[:, 0] == deactivate_action_index
+
 			intent_acc = (predicted_intent == y_intent).prod(1).float().mean() # all slots must be correct
+
+			if return_full_probabilities and self._sanitize_predictions_for_snips:
+				return predicted_intent,y_intent,intent_loss, intent_acc, activate_lights_probabilities, deactivate_lights_probabilities, activate_lights_gt, deactivate_lights_gt
 
 			return predicted_intent,y_intent,intent_loss, intent_acc # return both predicted as well as gold intent
 
