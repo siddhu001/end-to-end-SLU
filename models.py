@@ -949,7 +949,7 @@ class Model(torch.nn.Module):
 				start_idx = end_idx
 			predicted_intent = torch.stack(predicted_intent, dim=1)
 			if self._sanitize_predictions_for_snips:
-				raise NotImplementedError
+				from IPython import embed; embed(); raise ValueError("!")
 				# TODO(Vijay): implement AUC metrics for Snips
 
 			intent_acc = (predicted_intent == y_intent).prod(1).float().mean() # all slots must be correct
