@@ -23,6 +23,7 @@ parser.add_argument('--finetune_semantics_embedding', action='store_true', help=
 parser.add_argument('--random_split', action='store_true', help='randomly split dataset')
 parser.add_argument('--speaker_or_utterance_closed_split', action='store_true', help='speaker-or-utterance dataset (using the speaker-closed test set as the default test set)')
 parser.add_argument('--speaker_or_utterance_closed_with_utility_split', action='store_true', help='utility-optimized speaker-or-utterance dataset (using the speaker-closed test set as the default test set)')
+parser.add_argument('--speaker_or_utterance_closed_with_utility_perfect_split', action='store_true', help='train-test-difference-minimized speaker-or-utterance dataset (using the speaker-closed test set as the default test set)')
 parser.add_argument('--disjoint_split', action='store_true', help='split dataset with disjoint utterances in train set and test set')
 parser.add_argument('--restart', action='store_true', help='load checkpoint from a previous run')
 parser.add_argument('--config_path', type=str, help='path to config file with hyperparameters, etc.')
@@ -54,6 +55,7 @@ finetune_semantics_embedding = args.finetune_semantics_embedding
 random_split = args.random_split
 speaker_or_utterance_closed_split = args.speaker_or_utterance_closed_split
 speaker_or_utterance_closed_with_utility_split = args.speaker_or_utterance_closed_with_utility_split
+speaker_or_utterance_closed_with_utility_perfect_split = args.speaker_or_utterance_closed_with_utility_perfect_split
 disjoint_split = args.disjoint_split
 save_best_model = args.save_best_model
 seperate_RNN = args.seperate_RNN
@@ -112,6 +114,9 @@ if train:
 	elif speaker_or_utterance_closed_with_utility_split:
 		log_file=log_file+"_spk_or_utt_closed_with_utility_spk_test"
 		model_path=model_path + "_spk_or_utt_closed_with_utility_spk_test"
+	elif speaker_or_utterance_closed_with_utility_perfect_split:
+		log_file=log_file+"_perfect_spk_or_utt_closed_with_utility_spk_test"
+		model_path=model_path + "_perfect_spk_or_utt_closed_with_utility_spk_test"
 	elif random_split:
 		log_file=log_file+"_random"
 		model_path=model_path + "_random"
@@ -159,6 +164,7 @@ if train:
 																  single_label=single_label,
 																  speaker_or_utterance_closed_speaker_test=speaker_or_utterance_closed_split,
 																  speaker_or_utterance_closed_with_utility_speaker_test=speaker_or_utterance_closed_with_utility_split,
+																  speaker_or_utterance_closed_with_utility_perfect_speaker_test=speaker_or_utterance_closed_with_utility_perfect_split,
 																  snips_test_set=snips_test_set,
 																  downsample_train_factor=training_fraction)
 
