@@ -22,6 +22,8 @@ parser.add_argument('--speaker_or_utterance_closed_speaker_test', action='store_
 parser.add_argument('--speaker_or_utterance_closed_utterance_test', action='store_true', help='use speaker-or-utterance splits (using the utterance-closed test set)')
 parser.add_argument('--speaker_or_utterance_closed_with_utility_speaker_test', action='store_true', help='utility-optimized speaker-or-utterance dataset (using the speaker-closed test set)')
 parser.add_argument('--speaker_or_utterance_closed_with_utility_utterance_test', action='store_true', help='utility-optimized speaker-or-utterance dataset (using the utterance-closed test set)')
+parser.add_argument('--speaker_or_utterance_closed_with_utility_perfect_utterance_test', action='store_true', help='train-test-difference-minimized speaker-or-utterance dataset (using the utterance-closed test set)')
+parser.add_argument('--speaker_or_utterance_closed_with_utility_perfect_speaker_test', action='store_true', help='train-test-difference-minimized speaker-or-utterance dataset (using the speaker-closed test set)')
 parser.add_argument('--utterance_closed_split', action='store_true', help='use speaker-or-utterance splits (using the utterance-closed test set)')
 parser.add_argument('--snips_test_set', action='store_true',help='Whether to evaluate on Snips only.')
 parser.add_argument('--log_file_suffix', type=str, help="Suffix to add to logfile filename")
@@ -39,6 +41,8 @@ speaker_or_utterance_closed_speaker_test = args.speaker_or_utterance_closed_spea
 speaker_or_utterance_closed_utterance_test = args.speaker_or_utterance_closed_utterance_test
 speaker_or_utterance_closed_with_utility_speaker_test = args.speaker_or_utterance_closed_with_utility_speaker_test
 speaker_or_utterance_closed_with_utility_utterance_test = args.speaker_or_utterance_closed_with_utility_utterance_test
+speaker_or_utterance_closed_with_utility_perfect_speaker_test = args.speaker_or_utterance_closed_with_utility_perfect_speaker_test
+speaker_or_utterance_closed_with_utility_perfect_utterance_test = args.speaker_or_utterance_closed_with_utility_perfect_utterance_test
 utterance_closed_split = args.utterance_closed_split
 snips_test_set = args.snips_test_set
 log_file_suffix = args.log_file_suffix
@@ -56,7 +60,9 @@ train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,
 															  speaker_or_utterance_closed_speaker_test=speaker_or_utterance_closed_speaker_test,
 															  speaker_or_utterance_closed_utterance_test=speaker_or_utterance_closed_utterance_test,
 															  speaker_or_utterance_closed_with_utility_speaker_test=speaker_or_utterance_closed_with_utility_speaker_test,
-															  speaker_or_utterance_closed_with_utility_utterance_test=speaker_or_utterance_closed_with_utility_utterance_test)
+															  speaker_or_utterance_closed_with_utility_utterance_test=speaker_or_utterance_closed_with_utility_utterance_test,
+															  speaker_or_utterance_closed_with_utility_perfect_speaker_test=speaker_or_utterance_closed_with_utility_perfect_speaker_test,
+															  speaker_or_utterance_closed_with_utility_perfect_utterance_test=speaker_or_utterance_closed_with_utility_perfect_utterance_test)
 
 # Initialize model
 if use_FastText_embeddings:
