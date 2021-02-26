@@ -151,7 +151,8 @@ def get_SLU_datasets(config,
 					 single_label=False,
 					 snips_test_set=False,
 					 snips_type="close_field",
-					 downsample_train_factor=None):
+					 downsample_train_factor=None,
+					 stratify_downsampling_for_snips=None):
 	"""
 	config: Config object (contains info about model and training)
 	"""
@@ -239,7 +240,7 @@ def get_SLU_datasets(config,
 				test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "closed_utterance_test_data.csv"))
 		elif speaker_or_utterance_closed_with_utility_perfect_speaker_test or speaker_or_utterance_closed_with_utility_perfect_utterance_test:
 			valid_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_perfect", "valid_data.csv"))
-			if speaker_or_utterance_closed_with_utility_speaker_test:
+			if speaker_or_utterance_closed_with_utility_perfect_speaker_test:
 				test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_perfect", "closed_speaker_test_data.csv"))
 			else:
 				test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_perfect", "closed_utterance_test_data.csv"))
@@ -304,7 +305,18 @@ def get_SLU_datasets(config,
 		print("No phoneme file found.")
 
 	if downsample_train_factor is not None:
-		train_df = train_df.sample(frac=1, random_state=0).reset_index(drop=True)
+		# Do a stratified sample across unique slot combinations
+		intent_groups = train_df.groupby(["action", "object", "location"])
+
+		stratified_sampled_train_df = None
+		for group in intent_groups:
+			sampled_group = group[1].sample(frac=downsample_train_factor, random_state=0).reset_index(drop=True)
+			if stratified_sampled_train_df is None:
+				stratified_sampled_train_df = sampled_group.copy()
+			else:
+				stratified_sampled_train_df = pd.concat([stratified_sampled_train_df, sampled_group], axis=0)
+
+		train_df = stratified_sampled_train_df
 
 	# Create dataset objects
 	if use_gold_utterances: # Created support for training intent model on gold utterances
@@ -314,7 +326,7 @@ def get_SLU_datasets(config,
 				Sy_word.append(line.rstrip("\n"))
 		train_dataset = SLU_GoldDataset(train_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
 	else:
-		train_dataset = SLUDataset(train_df, base_path, Sy_intent, config,upsample_factor=config.dataset_upsample_factor, downsample_factor=downsample_train_factor)
+		train_dataset = SLUDataset(train_df, base_path, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
 
 	valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config)
 	test_dataset = SLUDataset(test_df, base_path, Sy_intent, config)
@@ -325,7 +337,7 @@ def rms_energy(x):
 	return 10*np.log10((1e-12 + x.dot(x))/len(x))
 
 class SLUDataset(torch.utils.data.Dataset):
-	def __init__(self, df, base_path, Sy_intent, config, upsample_factor=1, downsample_factor=None):
+	def __init__(self, df, base_path, Sy_intent, config, upsample_factor=1):
 		"""
 		df:
 		Sy_intent: Dictionary (transcript --> slot values)
@@ -339,16 +351,12 @@ class SLUDataset(torch.utils.data.Dataset):
 		self.SNRs = [0,5,10,15,20]
 		self.seq2seq = config.seq2seq
 		self.config = config
-		self.downsample_factor = downsample_factor
 
 		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU(self.Sy_intent, self.seq2seq))
 
 	def __len__(self):
 		#if self.augment: return len(self.df)*2 # second half of dataset is augmented
-		if self.downsample_factor is not None:
-			return int(len(self.df) * self.downsample_factor)
-		else:
-			return len(self.df) * self.upsample_factor
+		return len(self.df) * self.upsample_factor
 
 	def __getitem__(self, idx):
 		#augment = ((idx / len(self.df)) > 1) and self.augment
