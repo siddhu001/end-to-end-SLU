@@ -362,16 +362,17 @@ class Trainer:
 				else:
 					predicted_intent,y_intent,intent_loss, intent_acc = self.model.test(x, y_intent)
 
-				if activate_lights_probabilities is None:
-					activate_lights_probabilities = batch_activate_lights_probabilities.clone()
-					deactivate_lights_probabilities = batch_deactivate_lights_probabilities.clone()
-					activate_lights_gt = batch_activate_lights_gt.clone()
-					deactivate_lights_gt = batch_deactivate_lights_gt.clone()
-				else:
-					activate_lights_probabilities = torch.cat([activate_lights_probabilities, batch_activate_lights_probabilities], dim=0)
-					deactivate_lights_probabilities = torch.cat([deactivate_lights_probabilities, batch_deactivate_lights_probabilities], dim=0)
-					activate_lights_gt = torch.cat([activate_lights_gt, batch_activate_lights_gt], dim=0)
-					deactivate_lights_gt = torch.cat([deactivate_lights_gt, batch_deactivate_lights_gt], dim=0)
+				if compute_snips_auc_metrics:
+					if activate_lights_probabilities is None:
+						activate_lights_probabilities = batch_activate_lights_probabilities.clone()
+						deactivate_lights_probabilities = batch_deactivate_lights_probabilities.clone()
+						activate_lights_gt = batch_activate_lights_gt.clone()
+						deactivate_lights_gt = batch_deactivate_lights_gt.clone()
+					else:
+						activate_lights_probabilities = torch.cat([activate_lights_probabilities, batch_activate_lights_probabilities], dim=0)
+						deactivate_lights_probabilities = torch.cat([deactivate_lights_probabilities, batch_deactivate_lights_probabilities], dim=0)
+						activate_lights_gt = torch.cat([activate_lights_gt, batch_activate_lights_gt], dim=0)
+						deactivate_lights_gt = torch.cat([deactivate_lights_gt, batch_deactivate_lights_gt], dim=0)
 
 				test_intent_loss += intent_loss.cpu().data.numpy().item() * batch_size
 				test_intent_acc += intent_acc.cpu().data.numpy().item() * batch_size
