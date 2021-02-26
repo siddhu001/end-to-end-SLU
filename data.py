@@ -316,7 +316,7 @@ def get_SLU_datasets(config,
 			else:
 				stratified_sampled_train_df = pd.concat([stratified_sampled_train_df, sampled_group], axis=0)
 
-		train_df = stratified_sampled_train_df
+		train_df = stratified_sampled_train_df.reset_index(drop=True)
 
 	# Create dataset objects
 	if use_gold_utterances: # Created support for training intent model on gold utterances
