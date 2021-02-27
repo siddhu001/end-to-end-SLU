@@ -5,6 +5,7 @@ from models import PretrainedModel, Model, obtain_glove_embeddings, obtain_fastt
 from data import get_ASR_datasets, get_SLU_datasets, read_config
 from training import Trainer
 import argparse
+from collections import defaultdict
 import os
 
 # Get args
@@ -17,6 +18,8 @@ parser.add_argument('--save_words_path', default="/tmp/word_transcriptions.csv",
 parser.add_argument('--postprocess_words', action='store_true', help='postprocess words obtained from SLU pipeline')
 parser.add_argument('--use_semantic_embeddings', action='store_true', help='use Glove embeddings')
 parser.add_argument('--use_FastText_embeddings', action='store_true', help='use FastText embeddings')
+parser.add_argument('--use_bert_embeddings', action='store_true', help='use Bert embeddings')
+
 parser.add_argument('--semantic_embeddings_path', type=str, help='path for semantic embeddings')
 parser.add_argument('--finetune_embedding', action='store_true', help='tune SLU embeddings')
 parser.add_argument('--finetune_semantics_embedding', action='store_true', help='tune semantics embeddings')
@@ -32,7 +35,7 @@ parser.add_argument('--save_best_model', action='store_true', help='save the mod
 parser.add_argument('--smooth_semantic', action='store_true', help='sum semantic embedding of top k words')
 parser.add_argument('--smooth_semantic_parameter', type=str, default="5",help='value of k in smooth_smantic')
 parser.add_argument('--single_label', action='store_true',help='Whether our dataset contains a single intent label (or a full triple). Only applied for the FSC dataset.')
-parser.add_argument('--nlu_setup', action='store_true', help='use Gold utterances to run an NLU test pipeline')
+#parser.add_argument('--nlu_setup', action='store_true', help='use Gold utterances to run an NLU test pipeline')
 
 args = parser.parse_args()
 pretrain = args.pretrain
@@ -46,6 +49,8 @@ restart = args.restart
 config_path = args.config_path
 use_semantic_embeddings = args.use_semantic_embeddings
 use_FastText_embeddings = args.use_FastText_embeddings
+use_bert_embeddings = args.use_bert_embeddings
+
 semantic_embeddings_path = args.semantic_embeddings_path
 finetune_embedding = args.finetune_embedding
 finetune_semantics_embedding = args.finetune_semantics_embedding
@@ -59,7 +64,6 @@ smooth_semantic = args.smooth_semantic
 smooth_semantic_parameter = int(args.smooth_semantic_parameter)
 
 single_label = args.single_label
-nlu_setup = args.nlu_setup 
 
 
 # Read config file
@@ -121,6 +125,7 @@ if train:
 	elif use_FastText_embeddings:
 		log_file=log_file+"_FastText"
 		model_path=model_path + "_FastText"
+	
 
 	if smooth_semantic:
 		log_file=log_file+"_smooth_"+str(smooth_semantic_parameter)
@@ -144,10 +149,10 @@ if train:
 	# Generate datasets
 	use_gold_utterances = False
 	use_all_gold=False
-	if nlu_setup:
-		# make sure to load up word transcripts for train, val, AND test sets
-		use_gold_utterances = True
-		use_all_gold=True
+	# if nlu_setup:
+	# 	# make sure to load up word transcripts for train, val, AND test sets
+	# 	use_gold_utterances = True
+	# 	use_all_gold=True
 
 	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label,\
 	 use_all_gold = use_all_gold, use_gold_utterances = use_gold_utterances, utterance_closed = utterance_closed_split, utterance_closed_with_utility=utterance_closed_with_utility_split)
@@ -168,6 +173,7 @@ if train:
 				Sy_word.append(line.rstrip("\n"))
 		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
 		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
+	
 	else:
 		model = Model(config=config)
 
@@ -295,6 +301,14 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 				Sy_word.append(line.rstrip("\n"))
 		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
 		model = Model(config=config,pipeline=True, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
+	elif use_bert_embeddings: # use Bert encoder
+		vocab= {}
+		i = 0
+		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
+			lines = f.readlines()
+			for i in range(len(lines)):
+				vocab[i]=lines[i].rstrip("\n")
+		model = Model(config=config,pipeline=True, use_semantic_embeddings = use_bert_embeddings, use_bert_embeddings = True, glove_embeddings=semantic_embeddings_path,glove_emb_dim=768, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter, ix_to_vocab= vocab)
 	else:
 		model = Model(config=config,pipeline=True)
 
@@ -336,6 +350,9 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 	elif use_FastText_embeddings:
 		log_file=log_file+"_FastText"
 		only_model_path=only_model_path + "_FastText"
+	elif use_bert_embeddings:
+		log_file=log_file+"_bert"
+		only_model_path=only_model_path + "_bert"
 
 	log_file=log_file+".csv"
 	only_model_path=only_model_path + ".pth"

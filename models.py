@@ -4,6 +4,11 @@ import sys
 import os
 import math
 import io
+from transformers import (
+	AutoConfig,
+    AutoModelForMaskedLM,
+    AutoTokenizer
+)
 
 np.random.seed(0)
 
@@ -25,6 +30,74 @@ def sinc(band,t_right):
 	else: y=torch.cat([y_left,(torch.ones(1)),y_right])
 
 	return y
+
+class BertEncoder(torch.nn.Module):
+	"""
+	uses pretrained MLM bert to extract sentence embeddings for input words  
+	"""
+
+	def __init__(self, path_to_pretrained, ix_to_vocab):
+		super(BertEncoder, self).__init__()
+		config_kwargs = {
+        "cache_dir": None,
+        "revision": None,
+        "use_auth_token": None,
+		}
+		config = AutoConfig.from_pretrained(path_to_pretrained, **config_kwargs)
+
+		tokenizer_kwargs = {
+			"cache_dir": None,
+			"use_fast": True,
+			"revision": "main",
+			"use_auth_token": None,
+		}
+		self.tokenizer = AutoTokenizer.from_pretrained(path_to_pretrained, **tokenizer_kwargs)
+		
+		model = AutoModelForMaskedLM.from_pretrained(
+				path_to_pretrained,
+				from_tf=False,
+				config=config,
+				cache_dir=None,
+				revision=None,
+				use_auth_token=None,
+			)
+		if torch.cuda.is_available():
+			model.to('cuda')
+		model.eval()
+		self.encoder = model.bert.to('cuda')
+		
+		self.ix_to_vocab = ix_to_vocab
+
+	def forward(self, x):
+		"""
+		x: sequence of words 
+		"""
+		vocab = self.ix_to_vocab
+		
+		sents = []
+		for example in x: 
+			words = []
+			for j in example:
+				j = j.item()
+				if j in vocab and j != 0:
+					words.append(vocab[j])
+				elif j!= 0:
+					words.append("[MASK]")
+			sent = " ".join(words)
+			sents.append(sent)
+		
+
+		inputs = self.tokenizer(sents, return_tensors = 'pt', padding=True)
+		for inp in inputs:
+			inputs[inp] = inputs[inp].to('cuda')
+		if torch.cuda.is_available():
+			inputs = inputs.to('cuda')
+		self.encoder.to('cuda')
+		out = self.encoder(**inputs)
+		out = out.last_hidden_state
+		sent_emb = torch.mean(out, axis = 1)
+		return (sent_emb.view(sent_emb.shape[0], 1, sent_emb.shape[1])).to('cuda')
+
 
 class Downsample(torch.nn.Module):
 	"""
@@ -707,7 +780,7 @@ class Model(torch.nn.Module):
 	"""
 	End-to-end SLU model.
 	"""
-	def __init__(self, config, pipeline=False,finetune=False,use_semantic_embeddings = False, glove_embeddings=None,glove_emb_dim=100, finetune_semantic_embeddings = False, seperate_RNN=False, smooth_semantic= False, smooth_semantic_parameter= 1):
+	def __init__(self, config, pipeline=False,finetune=False,use_semantic_embeddings = False, glove_embeddings=None,glove_emb_dim=100, finetune_semantic_embeddings = False, seperate_RNN=False, smooth_semantic= False, smooth_semantic_parameter= 1, use_bert_embeddings = False, ix_to_vocab = None):
 		super(Model, self).__init__()
 		self.is_cuda = torch.cuda.is_available()
 		self.Sy_intent = config.Sy_intent
@@ -723,26 +796,38 @@ class Model(torch.nn.Module):
 		self.unfreezing_index = config.starting_unfreezing_index
 		self.intent_layers = []
 		
+		
 		if config.pretraining_type != 0:
 			self.freeze_all_layers()
 		self.seq2seq = config.seq2seq
 		out_dim = config.word_rnn_num_hidden[-1]
 		if config.word_rnn_bidirectional:
 			out_dim *= 2 
-		if pipeline: # Initialise word embedding for intent model with the weights of pretrained word classifier
+		self.use_semantic_embeddings = use_semantic_embeddings
+		self.use_bert_embeddings = use_bert_embeddings 
+		if use_bert_embeddings:
+			assert ix_to_vocab is not None
+
+		if use_semantic_embeddings: # Load pretrained semantic embedding to be used along with speech embeddings
+			if use_bert_embeddings:
+				# glove_embeddings is a checkpoint 
+				self.semantic_embeddings = BertEncoder(glove_embeddings, ix_to_vocab)
+			else:
+				self.semantic_embeddings= torch.nn.Embedding(config.vocabulary_size+1,glove_emb_dim)
+				self.semantic_embeddings.weight.data.copy_(torch.from_numpy(glove_embeddings))
+				if self.seperate_RNN==False: 
+					out_dim=out_dim+glove_emb_dim
+				self.semantic_embeddings.weight.requires_grad = finetune_semantic_embeddings
+				self.smooth_semantic=smooth_semantic
+				self.smooth_semantic_parameter=smooth_semantic_parameter
+		
+		elif pipeline: # Initialise word embedding for intent model with the weights of pretrained word classifier
 			self.embedding=torch.nn.Embedding(config.vocabulary_size+1,pretrained_model.word_linear.weight.data.shape[1])
 			self.embedding.weight.data[:config.vocabulary_size]=pretrained_model.word_linear.weight.data.clone()
 			self.embedding.weight.requires_grad = finetune
-		self.use_semantic_embeddings = use_semantic_embeddings
+		
 		self.seperate_RNN=seperate_RNN
-		if use_semantic_embeddings: # Load pretrained semantic embedding to be used along with speech embeddings
-			self.semantic_embeddings= torch.nn.Embedding(config.vocabulary_size+1,glove_emb_dim)
-			self.semantic_embeddings.weight.data.copy_(torch.from_numpy(glove_embeddings))
-			if self.seperate_RNN==False: 
-				out_dim=out_dim+glove_emb_dim
-			self.semantic_embeddings.weight.requires_grad = finetune_semantic_embeddings
-			self.smooth_semantic=smooth_semantic
-			self.smooth_semantic_parameter=smooth_semantic_parameter
+		
 		# fixed-length output:
 		if not self.seq2seq:
 			self.values_per_slot = config.values_per_slot
@@ -811,8 +896,13 @@ class Model(torch.nn.Module):
 				layer.name = "final_pool"
 				self.final_layers.append(layer)
 				self.final_layers = torch.nn.ModuleList(self.final_layers)
+			#elif self.use_bert_embeddings:
+				#layer = torch.nn.Linear(768, self.num_values_total)
 			else:
-				layer = torch.nn.Linear(out_dim, self.num_values_total)
+				if self.use_bert_embeddings:
+					layer = torch.nn.Linear(768, self.num_values_total)
+				else:	
+					layer = torch.nn.Linear(out_dim, self.num_values_total)
 				layer.name = "final_classifier"
 				self.intent_layers.append(layer)
 
@@ -954,21 +1044,34 @@ class Model(torch.nn.Module):
 			log_probs = self.decoder(out, y_intent)
 			return -log_probs.mean(), torch.tensor([0.])
 
-	def run_pipeline(self, x, y_intent): # code to run pipeline model
+	def run_pipeline(self, x, y_intent, use_bert = False): # code to run pipeline model
 		"""
 		x : LongTensor of shape (batch size, T) - utterance over which intent module is trained
 		y_intent : LongTensor of shape (batch size, num_slots)
 		"""
 		if self.is_cuda:
 			y_intent = y_intent.cuda()
-		out = self.embedding(x)
+		if not self.use_bert_embeddings:
+			out = self.embedding(x)
 
-		if self.use_semantic_embeddings:
 			out = torch.cat((out,self.semantic_embeddings(x)),dim=-1)
+		else:
+			out = self.semantic_embeddings(x)
+		
+			
+
+		
 
 		if not self.seq2seq:
-			for layer in self.intent_layers:
-				out = layer(out)
+			if self.use_bert_embeddings:
+				for layer in self.intent_layers[4:]:
+					layer = layer.to('cuda')
+					out = out.to('cuda')
+
+					out = layer(out)
+			else:
+				for layer in self.intent_layers:
+					out = layer(out)
 			intent_logits = out # shape: (batch size, num_values_total)
 
 			intent_loss = 0.
@@ -977,6 +1080,8 @@ class Model(torch.nn.Module):
 			for slot in range(len(self.values_per_slot)):
 				end_idx = start_idx + self.values_per_slot[slot]
 				subset = intent_logits[:, start_idx:end_idx]
+				subset = subset.to('cuda')
+				y_intent = y_intent.to('cuda')
 				intent_loss += torch.nn.functional.cross_entropy(subset, y_intent[:, slot])
 				predicted_intent.append(subset.max(1)[1])
 				start_idx = end_idx
