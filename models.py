@@ -6,8 +6,9 @@ import math
 import io
 from transformers import (
 	AutoConfig,
-    AutoModelForMaskedLM,
-    AutoTokenizer
+	AutoModelForMaskedLM,
+	AutoTokenizer,
+	BertModel
 )
 
 np.random.seed(0)
@@ -39,9 +40,9 @@ class BertEncoder(torch.nn.Module):
 	def __init__(self, path_to_pretrained, ix_to_vocab):
 		super(BertEncoder, self).__init__()
 		config_kwargs = {
-        "cache_dir": None,
-        "revision": None,
-        "use_auth_token": None,
+		"cache_dir": None,
+		"revision": None,
+		"use_auth_token": None,
 		}
 		config = AutoConfig.from_pretrained(path_to_pretrained, **config_kwargs)
 
@@ -63,8 +64,16 @@ class BertEncoder(torch.nn.Module):
 			)
 		if torch.cuda.is_available():
 			model.to('cuda')
-		model.eval()
+		# model.eval()
 		self.encoder = model.bert.to('cuda')
+		# self.encoder = BertModel.from_pretrained(
+		# 		path_to_pretrained,
+		# 		from_tf=False,
+		# 		config=config,
+		# 		cache_dir=None,
+		# 		revision=None,
+		# 		use_auth_token=None,
+		# 	).to('cuda')
 		
 		self.ix_to_vocab = ix_to_vocab
 
@@ -807,11 +816,15 @@ class Model(torch.nn.Module):
 		self.use_bert_embeddings = use_bert_embeddings 
 		if use_bert_embeddings:
 			assert ix_to_vocab is not None
-
+		self.seperate_RNN=seperate_RNN
 		if use_semantic_embeddings: # Load pretrained semantic embedding to be used along with speech embeddings
 			if use_bert_embeddings:
 				# glove_embeddings is a checkpoint 
-				self.semantic_embeddings = BertEncoder(glove_embeddings, ix_to_vocab)
+				self.semantic_embeddings = BertEncoder("bert-base-uncased", ix_to_vocab)
+				if not(finetune_semantic_embeddings):
+					print("nnnnnooo")
+					for param in self.semantic_embeddings.parameters():
+						param.requires_grad = False
 			else:
 				self.semantic_embeddings= torch.nn.Embedding(config.vocabulary_size+1,glove_emb_dim)
 				self.semantic_embeddings.weight.data.copy_(torch.from_numpy(glove_embeddings))
@@ -819,14 +832,11 @@ class Model(torch.nn.Module):
 					out_dim=out_dim+glove_emb_dim
 				self.semantic_embeddings.weight.requires_grad = finetune_semantic_embeddings
 				self.smooth_semantic=smooth_semantic
-				self.smooth_semantic_parameter=smooth_semantic_parameter
-		
-		elif pipeline: # Initialise word embedding for intent model with the weights of pretrained word classifier
+				self.smooth_semantic_parameter=smooth_semantic_parameter		
+		if pipeline: # Initialise word embedding for intent model with the weights of pretrained word classifier
 			self.embedding=torch.nn.Embedding(config.vocabulary_size+1,pretrained_model.word_linear.weight.data.shape[1])
 			self.embedding.weight.data[:config.vocabulary_size]=pretrained_model.word_linear.weight.data.clone()
 			self.embedding.weight.requires_grad = finetune
-		
-		self.seperate_RNN=seperate_RNN
 		
 		# fixed-length output:
 		if not self.seq2seq:
