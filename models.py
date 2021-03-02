@@ -6,14 +6,8 @@ import math
 import io
 from transformers import (
 	AutoConfig,
-<<<<<<< HEAD
     AutoModelForMaskedLM,
     AutoTokenizer, BertModel, BertTokenizer
-=======
-	AutoModelForMaskedLM,
-	AutoTokenizer,
-	BertModel
->>>>>>> fae87be074aba84c0c8ed65a57726ae16f2facc7
 )
 
 np.random.seed(0)
