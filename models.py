@@ -817,12 +817,8 @@ class Model(torch.nn.Module):
 					out_dim=out_dim+glove_emb_dim
 				self.semantic_embeddings.weight.requires_grad = finetune_semantic_embeddings
 				self.smooth_semantic=smooth_semantic
-<<<<<<< HEAD
 				self.smooth_semantic_parameter=smooth_semantic_parameter
 		
-=======
-				self.smooth_semantic_parameter=smooth_semantic_parameter		
->>>>>>> fae87be074aba84c0c8ed65a57726ae16f2facc7
 		if pipeline: # Initialise word embedding for intent model with the weights of pretrained word classifier
 			self.embedding=torch.nn.Embedding(config.vocabulary_size+1,pretrained_model.word_linear.weight.data.shape[1])
 			self.embedding.weight.data[:config.vocabulary_size]=pretrained_model.word_linear.weight.data.clone()
