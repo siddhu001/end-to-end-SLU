@@ -52,8 +52,11 @@ use_bert_embeddings = args.use_bert_embeddings
 semantic_embeddings_path = args.semantic_embeddings_path
 finetune_embedding = args.finetune_embedding
 finetune_semantics_embedding = args.finetune_semantics_embedding
+
 utterance_closed_utility_no_bleu = args.utterance_closed_utility_no_bleu
 utterance_closed_utility_bleu = args.utterance_closed_utility_bleu
+# utterance_closed_split = args.utterance_closed_split
+# utterance_closed_with_utility_split = args.utterance_closed_with_utility_split
 save_best_model = args.save_best_model
 seperate_RNN = args.seperate_RNN
 smooth_semantic = args.smooth_semantic
@@ -97,21 +100,21 @@ if train:
 	if postprocess_words:
 		log_file=log_file+"_postprocess"
 		model_path=model_path + "_postprocess"
-	# if disjoint_split:
-	# 	log_file=log_file+"_disjoint"
-	# 	model_path=model_path + "_disjoint"
+	if disjoint_split:
+		log_file=log_file+"_disjoint"
+		model_path=model_path + "_disjoint"
 	# elif random_split:
 	# 	log_file=log_file+"_random"
 	# 	model_path=model_path + "_random"
 	# elif random_split:
 	# 	log_file=log_file+"_random"
 	# 	model_path=model_path + "_random"
-	if utterance_closed_utility_bleu:
-		log_file = log_file+ "_utterance_closed_utility_bleu"
+	elif utterance_closed_split:
+		log_file = log_file+ "_utterance_closed"
 		model_path = model_path+  "_utterance_closed"
-	elif utterance_closed_utility_no_bleu:
-		log_file = log_file+ "_utterance_closed_utility_no_bleu"
-		model_path = model_path+  "_utterance_closed_utility_no_bleu"
+	elif utterance_closed_with_utility_split:
+		log_file = log_file+ "_utterance_closed_with_utility"
+		model_path = model_path+  "_utterance_closed_with_utility"
 
 	
 
@@ -338,6 +341,7 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 		only_model_path = only_model_path+  "_utterance_closed_utility_no_BLEU"
 		with_model_path=with_model_path + "_utterance_closed_utility_no_BLEU"
 
+
 	
 
 	if use_semantic_embeddings:
@@ -400,4 +404,3 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 		test_intent_acc, test_intent_loss = trainer.pipeline_test_decoder(test_dataset, gold=True, log_file=log_file)
 		print("========= Test results =========")
 		print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
-

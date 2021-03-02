@@ -1,3 +1,4 @@
+
 import torch
 import numpy as np
 import sys
@@ -6,8 +7,9 @@ import math
 import io
 from transformers import (
 	AutoConfig,
-    AutoModelForMaskedLM,
-    AutoTokenizer, BertModel, BertTokenizer
+	AutoModelForMaskedLM,
+	AutoTokenizer,
+	BertModel
 )
 
 np.random.seed(0)
@@ -43,18 +45,36 @@ class BertEncoder(torch.nn.Module):
 		"revision": None,
 		"use_auth_token": None,
 		}
-		
-		self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
-		
-		model = BertModel.from_pretrained('bert-base-uncased')
-		# if torch.cuda.is_available():
-		# 	model.to('cuda')
-		for param in model.parameters():
-			param.requires_grad = True
+		config = AutoConfig.from_pretrained(path_to_pretrained, **config_kwargs)
 
-		self.encoder = model
+		tokenizer_kwargs = {
+			"cache_dir": None,
+			"use_fast": True,
+			"revision": "main",
+			"use_auth_token": None,
+		}
+		self.tokenizer = AutoTokenizer.from_pretrained(path_to_pretrained, **tokenizer_kwargs)
+		
+		model = AutoModelForMaskedLM.from_pretrained(
+				path_to_pretrained,
+				from_tf=False,
+				config=config,
+				cache_dir=None,
+				revision=None,
+				use_auth_token=None,
+			)
 		if torch.cuda.is_available():
-			self.encoder = self.encoder.to('cuda')
+			model.to('cuda')
+		# model.eval()
+		self.encoder = model.bert.to('cuda')
+		# self.encoder = BertModel.from_pretrained(
+		# 		path_to_pretrained,
+		# 		from_tf=False,
+		# 		config=config,
+		# 		cache_dir=None,
+		# 		revision=None,
+		# 		use_auth_token=None,
+		# 	).to('cuda')
 		
 		self.ix_to_vocab = ix_to_vocab
 
@@ -77,20 +97,16 @@ class BertEncoder(torch.nn.Module):
 			sents.append(sent)
 		
 
-		inputs = self.tokenizer.batch_encode_plus(sents, return_tensors = 'pt', padding=True, add_special_tokens=True)
-		
+		inputs = self.tokenizer(sents, return_tensors = 'pt', padding=True)
+		for inp in inputs:
+			inputs[inp] = inputs[inp].to('cuda')
 		if torch.cuda.is_available():
-			for inp in inputs:
-				inputs[inp] = inputs[inp].to('cuda')
 			inputs = inputs.to('cuda')
-			self.encoder.to('cuda')
+		self.encoder.to('cuda')
 		out = self.encoder(**inputs)
 		out = out.last_hidden_state
 		sent_emb = torch.mean(out, axis = 1)
-		sent_emb = sent_emb.view(sent_emb.shape[0], 1, sent_emb.shape[1])
-		if torch.cuda.is_available():
-			sent_emb = sent_emb.to('cuda')
-		return sent_emb
+		return (sent_emb.view(sent_emb.shape[0], 1, sent_emb.shape[1])).to('cuda')
 
 
 class Downsample(torch.nn.Module):
@@ -363,7 +379,6 @@ class PretrainedModel(torch.nn.Module):
 		x : Tensor of shape (batch size, T)
 		y_phoneme : LongTensor of shape (batch size, T')
 		y_word : LongTensor of shape (batch size, T'')
-
 		Compute loss for y_word and y_phoneme for each x in the batch.
 		"""
 		self.is_cuda = next(self.parameters()).is_cuda
@@ -493,7 +508,6 @@ class Attention(torch.nn.Module):
 		"""
 		encoder_states: Tensor of shape (batch size, T, encoder_dim)
 		decoder_state: Tensor of shape (batch size, decoder_dim)
-
 		Map the input sequence to a summary vector (batch size, value_dim) using attention, given a query.
 		"""
 		keys = self.key_linear(encoder_states)
@@ -530,7 +544,6 @@ class DecoderRNN(torch.nn.Module):
 		"""
 		input: Tensor of shape (batch size, input_size)
 		previous_state: Tensor of shape (batch size, num_decoder_layers, num_decoder_hidden)
-
 		Given the input vector, update the hidden state of each decoder layer.
 		"""
 		# return self.gru(input, previous_state)
@@ -817,8 +830,7 @@ class Model(torch.nn.Module):
 					out_dim=out_dim+glove_emb_dim
 				self.semantic_embeddings.weight.requires_grad = finetune_semantic_embeddings
 				self.smooth_semantic=smooth_semantic
-				self.smooth_semantic_parameter=smooth_semantic_parameter
-		
+				self.smooth_semantic_parameter=smooth_semantic_parameter		
 		if pipeline: # Initialise word embedding for intent model with the weights of pretrained word classifier
 			self.embedding=torch.nn.Embedding(config.vocabulary_size+1,pretrained_model.word_linear.weight.data.shape[1])
 			self.embedding.weight.data[:config.vocabulary_size]=pretrained_model.word_linear.weight.data.clone()
@@ -858,7 +870,7 @@ class Model(torch.nn.Module):
 					self.semantic_layers.append(layer)
 				self.semantic_layers = torch.nn.ModuleList(self.semantic_layers)
 			for idx in range(num_rnn_layers):
-					# recurrent
+				# recurrent
 				layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.intent_rnn_num_hidden[idx], batch_first=True, bidirectional=config.intent_rnn_bidirectional)
 				layer.name = "intent_rnn%d" % idx
 				self.intent_layers.append(layer)
@@ -871,7 +883,6 @@ class Model(torch.nn.Module):
 				layer = RNNSelect()
 				layer.name = "intent_rnn_select%d" % idx
 				self.intent_layers.append(layer)
-				
 
 				# dropout
 				layer = torch.nn.Dropout(p=config.intent_rnn_drop[idx])
@@ -1041,7 +1052,7 @@ class Model(torch.nn.Module):
 			log_probs = self.decoder(out, y_intent)
 			return -log_probs.mean(), torch.tensor([0.])
 
-	def run_pipeline(self, x, y_intent): # code to run pipeline model
+	def run_pipeline(self, x, y_intent, use_bert = False): # code to run pipeline model
 		"""
 		x : LongTensor of shape (batch size, T) - utterance over which intent module is trained
 		y_intent : LongTensor of shape (batch size, num_slots)
@@ -1061,15 +1072,12 @@ class Model(torch.nn.Module):
 
 		if not self.seq2seq:
 			if self.use_bert_embeddings:
-				#import pdb; pdb.set_trace()
 				for layer in self.intent_layers[4:]:
-					if torch.cuda.is_available():
-						layer = layer.to('cuda')
-						out = out.to('cuda')
+					layer = layer.to('cuda')
+					out = out.to('cuda')
 
 					out = layer(out)
 			else:
-				
 				for layer in self.intent_layers:
 					out = layer(out)
 			intent_logits = out # shape: (batch size, num_values_total)
@@ -1080,9 +1088,8 @@ class Model(torch.nn.Module):
 			for slot in range(len(self.values_per_slot)):
 				end_idx = start_idx + self.values_per_slot[slot]
 				subset = intent_logits[:, start_idx:end_idx]
-				if torch.cuda.is_available():
-					subset = subset.to('cuda')
-					y_intent = y_intent.to('cuda')
+				subset = subset.to('cuda')
+				y_intent = y_intent.to('cuda')
 				intent_loss += torch.nn.functional.cross_entropy(subset, y_intent[:, slot])
 				predicted_intent.append(subset.max(1)[1])
 				start_idx = end_idx
@@ -1244,4 +1251,3 @@ class Model(torch.nn.Module):
 				intent = self.one_hot_to_string(predicted_intent[0,i],self.Sy_intent)
 				intents.append(intent)
 			return intents
-
