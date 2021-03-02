@@ -137,7 +137,7 @@ def read_config(config_file):
 
 	return config
 
-def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False, utterance_closed = False, utterance_closed_with_utility = False,single_label=True, 
+def get_SLU_datasets(config,use_gold_utterances=False, utterance_closed_no_bleu = False, utterance_closed_with_bleu = False,single_label=False, 
 use_all_gold = False, asr_setup = False):
 	"""
 	config: Config object (contains info about model and training)
@@ -147,16 +147,16 @@ use_all_gold = False, asr_setup = False):
 	# Split - Added support for random split and disjoint split
 	if not config.seq2seq:
 		synthetic_train_df = pd.read_csv(os.path.join(base_path, "data", "synthetic_data.csv"))
-		if random_split:
-			real_train_df = pd.read_csv(os.path.join(base_path, "data/random_splits", "train_data.csv"))
-		elif disjoint_split:
-			real_train_df = pd.read_csv(os.path.join(base_path, "data/zeroshot_splits", "train_data.csv"))
-		elif single_label:
+		# if random_split:
+		# 	real_train_df = pd.read_csv(os.path.join(base_path, "data/random_splits", "train_data.csv"))
+		# elif disjoint_split:
+		# 	real_train_df = pd.read_csv(os.path.join(base_path, "data/zeroshot_splits", "train_data.csv"))
+		if single_label:
 			real_train_df = pd.read_csv(os.path.join(base_path, "data/single_label", "train_data.csv"))
-		elif utterance_closed:
-			real_train_df = pd.read_csv(os.path.join(base_path, "data/utterance_closed_splits", "train_data.csv"))
-		elif utterance_closed_with_utility:
-			real_train_df = pd.read_csv(os.path.join(base_path, "data/utterance_closed_splits_utility", "train_data.csv"))
+		elif utterance_closed_with_bleu:
+			real_train_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "train_data.csv"))
+		elif utterance_closed_no_bleu:
+			real_train_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_noBLEU", "train_data.csv"))
 		
 		else:
 			real_train_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "train_data.csv"))
@@ -201,21 +201,16 @@ use_all_gold = False, asr_setup = False):
 
 	train_df = pd.concat([synthetic_train_df, real_train_df]).reset_index()
 	if not config.seq2seq: # Read valid and test set - Added support for random split and disjoint split
-		if random_split: 
-			valid_df = pd.read_csv(os.path.join(base_path, "data/random_splits", "valid_data.csv"))
-			test_df = pd.read_csv(os.path.join(base_path, "data/random_splits", "test_data.csv"))
-		elif disjoint_split:
-			valid_df = pd.read_csv(os.path.join(base_path, "data/zeroshot_splits", "valid_data.csv"))
-			test_df = pd.read_csv(os.path.join(base_path, "data/zeroshot_splits", "test_data.csv"))
-		elif single_label:
+		
+		if single_label:
 			valid_df = pd.read_csv(os.path.join(base_path, "data/single_label", "valid_data.csv"))
 			test_df = pd.read_csv(os.path.join(base_path, "data/single_label", "test_data.csv"))
-		elif utterance_closed:
-			valid_df = pd.read_csv(os.path.join(base_path, "data/utterance_closed_splits", "valid_data.csv"))
-			test_df = pd.read_csv(os.path.join(base_path, "data/utterance_closed_splits", "test_data.csv"))
-		elif utterance_closed_with_utility:
-			valid_df = pd.read_csv(os.path.join(base_path, "data/utterance_closed_splits_utility", "valid_data.csv"))
-			test_df = pd.read_csv(os.path.join(base_path, "data/utterance_closed_splits_utility", "test_data.csv"))
+		elif utterance_closed_no_bleu:
+			valid_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_noBLEU", "valid_data.csv"))
+			test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_noBLEU", "closed_utterance_test_data.csv"))
+		elif utterance_closed_with_bleu:
+			valid_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "valid_data.csv"))
+			test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "closed_utterance_test_data.csv"))
 		else:
 			valid_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "valid_data.csv"))
 			test_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "test_data.csv"))

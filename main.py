@@ -23,10 +23,8 @@ parser.add_argument('--use_bert_embeddings', action='store_true', help='use Bert
 parser.add_argument('--semantic_embeddings_path', type=str, help='path for semantic embeddings')
 parser.add_argument('--finetune_embedding', action='store_true', help='tune SLU embeddings')
 parser.add_argument('--finetune_semantics_embedding', action='store_true', help='tune semantics embeddings')
-parser.add_argument('--random_split', action='store_true', help='randomly split dataset')
-parser.add_argument('--disjoint_split', action='store_true', help='split dataset with disjoint utterances in train set and test set')
-parser.add_argument('--utterance_closed_split', action='store_true', help='load closed utterance train/val/test')
-parser.add_argument('--utterance_closed_with_utility_split', action='store_true', help='load closed utterance (utility) train/val/test')
+parser.add_argument('--utterance_closed_utility_bleu', action='store_true', help='load closed utterance train/val/test')
+parser.add_argument('--utterance_closed_utility_no_bleu', action='store_true', help='load closed utterance (utility) train/val/test')
 parser.add_argument('--restart', action='store_true', help='load checkpoint from a previous run')
 parser.add_argument('--config_path', type=str, help='path to config file with hyperparameters, etc.')
 parser.add_argument('--pipeline_gold_train', action='store_true', help='run SLU training in pipeline manner with gold set utterances')
@@ -54,10 +52,8 @@ use_bert_embeddings = args.use_bert_embeddings
 semantic_embeddings_path = args.semantic_embeddings_path
 finetune_embedding = args.finetune_embedding
 finetune_semantics_embedding = args.finetune_semantics_embedding
-random_split = args.random_split
-disjoint_split = args.disjoint_split
-utterance_closed_split = args.utterance_closed_split
-utterance_closed_with_utility_split = args.utterance_closed_with_utility_split
+utterance_closed_utility_no_bleu = args.utterance_closed_utility_no_bleu
+utterance_closed_utility_bleu = args.utterance_closed_utility_bleu
 save_best_model = args.save_best_model
 seperate_RNN = args.seperate_RNN
 smooth_semantic = args.smooth_semantic
@@ -101,21 +97,21 @@ if train:
 	if postprocess_words:
 		log_file=log_file+"_postprocess"
 		model_path=model_path + "_postprocess"
-	if disjoint_split:
-		log_file=log_file+"_disjoint"
-		model_path=model_path + "_disjoint"
-	elif random_split:
-		log_file=log_file+"_random"
-		model_path=model_path + "_random"
-	elif random_split:
-		log_file=log_file+"_random"
-		model_path=model_path + "_random"
-	elif utterance_closed_split:
-		log_file = log_file+ "_utterance_closed"
+	# if disjoint_split:
+	# 	log_file=log_file+"_disjoint"
+	# 	model_path=model_path + "_disjoint"
+	# elif random_split:
+	# 	log_file=log_file+"_random"
+	# 	model_path=model_path + "_random"
+	# elif random_split:
+	# 	log_file=log_file+"_random"
+	# 	model_path=model_path + "_random"
+	if utterance_closed_utility_bleu:
+		log_file = log_file+ "_utterance_closed_utility_bleu"
 		model_path = model_path+  "_utterance_closed"
-	elif utterance_closed_with_utility_split:
-		log_file = log_file+ "_utterance_closed_with_utility"
-		model_path = model_path+  "_utterance_closed_with_utility"
+	elif utterance_closed_utility_no_bleu:
+		log_file = log_file+ "_utterance_closed_utility_no_bleu"
+		model_path = model_path+  "_utterance_closed_utility_no_bleu"
 
 	
 
@@ -281,8 +277,8 @@ if pipeline_train: # Train model in pipeline manner
 
 if pipeline_gold_train: # Train model in pipeline manner by using gold set utterances
 	# Generate datasets
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label,use_all_gold=True,\
-	utterance_closed = utterance_closed_split, utterance_closed_with_utility=utterance_closed_with_utility_split)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,single_label=single_label,use_all_gold=True,\
+	utterance_closed_with_bleu = utterance_closed_utility_bleu, utterance_closed_no_bleu=utterance_closed_utility_no_bleu)
 
 	print(valid_dataset)
 	print(test_dataset)
@@ -324,23 +320,23 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 		log_file=log_file+"_postprocess"
 		only_model_path=only_model_path + "_postprocess"
 		with_model_path=with_model_path + "_postprocess"
-	if disjoint_split:
-		log_file=log_file+"_disjoint"
-		only_model_path=only_model_path + "_disjoint"
-		with_model_path=with_model_path + "_disjoint"
-	elif random_split:
-		log_file=log_file+"_random"
-		only_model_path=only_model_path + "_random"
-		with_model_path=with_model_path + "_random"
+	# if disjoint_split:
+	# 	log_file=log_file+"_disjoint"
+	# 	only_model_path=only_model_path + "_disjoint"
+	# 	with_model_path=with_model_path + "_disjoint"
+	# elif random_split:
+	# 	log_file=log_file+"_random"
+	# 	only_model_path=only_model_path + "_random"
+	# 	with_model_path=with_model_path + "_random"
 
-	elif utterance_closed_split:
-		log_file = log_file+ "_utterance_closed"
-		only_model_path = only_model_path+  "_utterance_closed"
+	if utterance_closed_utility_bleu:
+		log_file = log_file+ "_utterance_closed_utility_with_BLEU"
+		only_model_path = only_model_path+  "_utterance_closed_utility_with_BLEU"
 		ith_model_path=with_model_path +"_utterance_closed"
-	elif utterance_closed_with_utility_split:
-		log_file = log_file+ "_utterance_closed_with_utility"
-		only_model_path = only_model_path+  "_utterance_closed_with_utility"
-		with_model_path=with_model_path + "_utterance_closed_with_utility"
+	elif utterance_closed_utility_no_bleu:
+		log_file = log_file+ "_utterance_closed_utility_no_BLEU"
+		only_model_path = only_model_path+  "_utterance_closed_utility_no_BLEU"
+		with_model_path=with_model_path + "_utterance_closed_utility_no_BLEU"
 
 	
 
