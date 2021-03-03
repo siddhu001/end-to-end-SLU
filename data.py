@@ -171,7 +171,7 @@ def get_SLU_datasets(config,
 		elif speaker_or_utterance_closed_speaker_test or speaker_or_utterance_closed_utterance_test:
 			real_train_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits", "train_data.csv"))
 		elif speaker_or_utterance_closed_with_utility_speaker_test or speaker_or_utterance_closed_with_utility_utterance_test:
-			real_train_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "train_data.csv"))
+			real_train_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_noBLEU", "train_data.csv"))
 		elif speaker_or_utterance_closed_with_utility_perfect_speaker_test or speaker_or_utterance_closed_with_utility_perfect_utterance_test:
 			real_train_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_perfect", "train_data.csv"))
 		else:
@@ -233,11 +233,11 @@ def get_SLU_datasets(config,
 			else:
 				test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits", "closed_utterance_test_data.csv"))
 		elif speaker_or_utterance_closed_with_utility_speaker_test or speaker_or_utterance_closed_with_utility_utterance_test:
-			valid_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "valid_data.csv"))
+			valid_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_noBLEU", "valid_data.csv"))
 			if speaker_or_utterance_closed_with_utility_speaker_test:
-				test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "closed_speaker_test_data.csv"))
+				test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_noBLEU", "closed_speaker_test_data.csv"))
 			else:
-				test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "closed_utterance_test_data.csv"))
+				test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_noBLEU", "closed_utterance_test_data.csv"))
 		elif speaker_or_utterance_closed_with_utility_perfect_speaker_test or speaker_or_utterance_closed_with_utility_perfect_utterance_test:
 			valid_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_perfect", "valid_data.csv"))
 			if speaker_or_utterance_closed_with_utility_perfect_speaker_test:

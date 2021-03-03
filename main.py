@@ -112,8 +112,8 @@ if train:
 		log_file=log_file+"_spk_or_utt_closed_spk_test"
 		model_path=model_path + "_spk_or_utt_closed_spk_test"
 	elif speaker_or_utterance_closed_with_utility_split:
-		log_file=log_file+"_spk_or_utt_closed_with_utility_spk_test"
-		model_path=model_path + "_spk_or_utt_closed_with_utility_spk_test"
+		log_file=log_file+"_spk_or_utt_closed_with_utility_spk_test_noBLEU"
+		model_path=model_path + "_spk_or_utt_closed_with_utility_spk_test_noBLEU"
 	elif speaker_or_utterance_closed_with_utility_perfect_split:
 		log_file=log_file+"_perfect_spk_or_utt_closed_with_utility_spk_test"
 		model_path=model_path + "_perfect_spk_or_utt_closed_with_utility_spk_test"
