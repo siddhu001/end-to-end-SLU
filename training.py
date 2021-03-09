@@ -5,7 +5,14 @@ import os
 from data import SLUDataset, ASRDataset
 from models import PretrainedModel, Model
 import pandas as pd
-from sklearn.metrics import average_precision_score
+from sklearn.metrics import average_precision_score, f1_score, precision_recall_curve
+
+import matplotlib.pyplot as plt
+
+def f1_at_threshold(gt, pred_prob, threshold):
+	y_pred = [p > threshold for p in pred_prob]
+	return f1_score(gt, y_pred)
+
 
 class Trainer:
 	def __init__(self, model, config):
@@ -315,7 +322,7 @@ class Trainer:
 		self.log(results, log_file)
 		return test_intent_acc, test_intent_loss
 
-	def get_error(self, dataset, compute_snips_auc_metrics=False, error_path=None, log_file=None): # Code to generate csv file containing error cases for model
+	def get_error(self, dataset, compute_snips_auc_metrics=False, error_path=None, log_file=None, validation_dataset=None): # Code to generate csv file containing error cases for model
 		if isinstance(dataset, ASRDataset):
 			test_phone_acc = 0
 			test_phone_loss = 0
@@ -349,10 +356,51 @@ class Trainer:
 			self.model.eval()
 			self.model.cpu(); self.model.is_cuda = False # beam search is memory-intensive; do on CPU for now
 
+			if compute_snips_auc_metrics and validation_dataset is not None:
+				val_activate_lights_probabilities = None
+				val_deactivate_lights_probabilities = None
+				val_activate_lights_gt = None
+				val_deactivate_lights_gt = None
+
+				# Evaluate on validation set
+				for idx, batch in enumerate(validation_dataset.loader):
+					x,x_path, y_intent = batch
+					batch_size = len(x)
+					num_examples += batch_size
+					if compute_snips_auc_metrics:
+						predicted_intent,y_intent,intent_loss, intent_acc, batch_val_activate_lights_probabilities, batch_val_deactivate_lights_probabilities, batch_val_activate_lights_gt, batch_val_deactivate_lights_gt = self.model.test(x, y_intent, return_full_probabilities=True)
+					else:
+						predicted_intent,y_intent,intent_loss, intent_acc = self.model.test(x, y_intent)
+
+					if compute_snips_auc_metrics:
+						if val_activate_lights_probabilities is None:
+							val_activate_lights_probabilities = batch_val_activate_lights_probabilities.clone()
+							val_deactivate_lights_probabilities = batch_val_deactivate_lights_probabilities.clone()
+							val_activate_lights_gt = batch_val_activate_lights_gt.clone()
+							val_deactivate_lights_gt = batch_val_deactivate_lights_gt.clone()
+						else:
+							val_activate_lights_probabilities = torch.cat([val_activate_lights_probabilities, batch_val_activate_lights_probabilities], dim=0)
+							val_deactivate_lights_probabilities = torch.cat([val_deactivate_lights_probabilities, batch_val_deactivate_lights_probabilities], dim=0)
+							val_activate_lights_gt = torch.cat([val_activate_lights_gt, batch_val_activate_lights_gt], dim=0)
+							val_deactivate_lights_gt = torch.cat([val_deactivate_lights_gt, batch_val_deactivate_lights_gt], dim=0)
+
+				val_activate_lights_gt = val_activate_lights_gt.detach().numpy()
+				val_deactivate_lights_gt = val_deactivate_lights_gt.detach().numpy()
+				val_activate_lights_probabilities = val_activate_lights_probabilities.detach().numpy()
+				val_deactivate_lights_probabilities = val_deactivate_lights_probabilities.detach().numpy()
+
+				activate_precision, activate_recall, activate_thresholds = precision_recall_curve(val_activate_lights_gt, val_activate_lights_probabilities)
+				deactivate_precision, deactivate_recall, deactivate_thresholds = precision_recall_curve(val_deactivate_lights_gt, val_deactivate_lights_probabilities)
+				activate_f1 = 2 * (activate_precision * activate_recall) / (activate_precision + activate_recall)
+				deactivate_f1 = 2 * (deactivate_precision * deactivate_recall) / (deactivate_precision + deactivate_recall)
+				best_activate_thresh = activate_thresholds[np.nanargmax(activate_f1)]
+				best_deactivate_thresh = deactivate_thresholds[np.nanargmax(deactivate_f1)]
+
 			activate_lights_probabilities = None
 			deactivate_lights_probabilities = None
 			activate_lights_gt = None
 			deactivate_lights_gt = None
+
 			for idx, batch in enumerate(dataset.loader):
 				x,x_path, y_intent = batch
 				batch_size = len(x)
@@ -400,24 +448,30 @@ class Trainer:
 				activate_lights_gt = activate_lights_gt.detach().numpy()
 				deactivate_lights_gt = deactivate_lights_gt.detach().numpy()
 
-				activate_lights_ap = average_precision_score(activate_lights_gt, activate_lights_probabilities)
-				deactivate_lights_ap = average_precision_score(deactivate_lights_gt, deactivate_lights_probabilities)
+				#activate_lights_ap = average_precision_score(activate_lights_gt, activate_lights_probabilities)
+				#deactivate_lights_ap = average_precision_score(deactivate_lights_gt, deactivate_lights_probabilities)
+				activate_lights_f1 = f1_at_threshold(activate_lights_gt, activate_lights_probabilities, best_activate_thresh)
+				deactivate_lights_f1 = f1_at_threshold(deactivate_lights_gt, deactivate_lights_probabilities, best_deactivate_thresh)
 
 			self.model.cuda(); self.model.is_cuda = True
 			test_intent_loss /= num_examples
 			test_intent_acc /= num_examples
 			results = {"intent_loss" : test_intent_loss, "intent_acc" : test_intent_acc, "set": "valid"}
 			if compute_snips_auc_metrics:
-				results["activate_lights_ap"] = activate_lights_ap
-				results["deactivate_lights_ap"] = deactivate_lights_ap
+				#results["activate_lights_ap"] = activate_lights_ap
+				#results["deactivate_lights_ap"] = deactivate_lights_ap
+
+				results["activate_lights_f1"] = activate_lights_f1
+				results["deactivate_lights_f1"] = deactivate_lights_f1
 			if log_file is not None:
 				self.log(results, log_file)
 			else:
 				self.log(results)
+
 			df=pd.DataFrame({'audio path': complete_path_filter,'prediction': complete_pred,'correct label': complete_y})
 			if error_path is not None:
 				df.to_csv(error_path,index=False)
 
 			if compute_snips_auc_metrics:
-				return test_intent_acc, test_intent_loss, activate_lights_ap, deactivate_lights_ap
+				return test_intent_acc, test_intent_loss, activate_lights_f1, deactivate_lights_f1
 			return test_intent_acc, test_intent_loss 

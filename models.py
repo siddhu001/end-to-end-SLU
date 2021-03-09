@@ -1053,12 +1053,11 @@ class Model(torch.nn.Module):
 				start_idx = end_idx
 				slot_probabilities.append(torch.nn.functional.softmax(subset, dim=1))
 
-			# We don't care about the location slot.
-			slot_probabilities = slot_probabilities[:2]
-
 			predicted_intent = torch.stack(predicted_intent, dim=1)
 
 			if self._sanitize_predictions_for_snips:
+				# We don't care about the location slot.
+				slot_probabilities = slot_probabilities[:2]
 				# Set location to be None for all predictions, since Snips does not have
 				# this slot.
 				predicted_intent[:, 2]=0

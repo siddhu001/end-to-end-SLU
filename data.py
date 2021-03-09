@@ -150,7 +150,6 @@ def get_SLU_datasets(config,
 					 speaker_or_utterance_closed_with_utility_perfect_utterance_test=False,
 					 single_label=False,
 					 snips_test_set=False,
-					 snips_type="close_field",
 					 downsample_train_factor=None,
 					 stratify_downsampling_for_snips=None):
 	"""
@@ -248,6 +247,7 @@ def get_SLU_datasets(config,
 			valid_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "valid_data.csv"))
 			test_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "test_data.csv"))
 		if snips_test_set:
+			valid_df = pd.read_csv(os.path.join(snips_base_path, "valid_data.csv"))
 			test_df = pd.read_csv(os.path.join(snips_base_path, "test_data.csv"))
 	else:
 		valid_df = pd.read_csv(os.path.join(base_path, "data", "valid_data_seq2seq.csv"))
@@ -328,7 +328,12 @@ def get_SLU_datasets(config,
 	else:
 		train_dataset = SLUDataset(train_df, base_path, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
 
-	valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config)
+	if snips_test_set:
+		train_dataset=None
+	if len(valid_df) > 0:
+		valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config)
+	else:
+		valid_dataset = None
 	test_dataset = SLUDataset(test_df, base_path, Sy_intent, config)
 	return train_dataset, valid_dataset, test_dataset
 

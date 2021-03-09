@@ -56,13 +56,26 @@ torch.manual_seed(config.seed); np.random.seed(config.seed)
 # Generate datasets
 train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,
 															  disjoint_split=disjoint_split,
-															  snips_test_set=snips_test_set,
 															  speaker_or_utterance_closed_speaker_test=speaker_or_utterance_closed_speaker_test,
 															  speaker_or_utterance_closed_utterance_test=speaker_or_utterance_closed_utterance_test,
 															  speaker_or_utterance_closed_with_utility_speaker_test=speaker_or_utterance_closed_with_utility_speaker_test,
 															  speaker_or_utterance_closed_with_utility_utterance_test=speaker_or_utterance_closed_with_utility_utterance_test,
 															  speaker_or_utterance_closed_with_utility_perfect_speaker_test=speaker_or_utterance_closed_with_utility_perfect_speaker_test,
 															  speaker_or_utterance_closed_with_utility_perfect_utterance_test=speaker_or_utterance_closed_with_utility_perfect_utterance_test)
+
+if snips_test_set:
+	_, valid_dataset_snips, test_dataset_snips = get_SLU_datasets(config,
+																disjoint_split=disjoint_split,
+																snips_test_set=snips_test_set,
+																speaker_or_utterance_closed_speaker_test=speaker_or_utterance_closed_speaker_test,
+																speaker_or_utterance_closed_utterance_test=speaker_or_utterance_closed_utterance_test,
+																speaker_or_utterance_closed_with_utility_speaker_test=speaker_or_utterance_closed_with_utility_speaker_test,
+																speaker_or_utterance_closed_with_utility_utterance_test=speaker_or_utterance_closed_with_utility_utterance_test,
+																speaker_or_utterance_closed_with_utility_perfect_speaker_test=speaker_or_utterance_closed_with_utility_perfect_speaker_test,
+																speaker_or_utterance_closed_with_utility_perfect_utterance_test=speaker_or_utterance_closed_with_utility_perfect_utterance_test)
+else:
+	valid_dataset_snips, test_dataset_snips = None, None
+
 
 # Initialize model
 if use_FastText_embeddings:
@@ -90,8 +103,8 @@ if restart: trainer.load_checkpoint(model_path)
 print(f"Wrote test log file to {log_file}.")
 print("========= Test results (trainer.get_error) =========")
 if snips_test_set:
-	test_intent_acc, test_intent_loss, activate_lights_ap, deactivate_lights_ap = trainer.get_error(test_dataset, error_path=args.error_path, compute_snips_auc_metrics=True, log_file=log_file)
-	print("*intents*| test accuracy: %.2f| test loss: %.2f | activate lights AP: %.2f | deactivate lights AP: %.2f\n" % (test_intent_acc, test_intent_loss, activate_lights_ap, deactivate_lights_ap) )
+	test_intent_acc, test_intent_loss, activate_lights_ap, deactivate_lights_ap = trainer.get_error(test_dataset_snips, error_path=args.error_path, compute_snips_auc_metrics=True, log_file=log_file, validation_dataset=valid_dataset_snips)
+	print("*intents*| test accuracy: %.2f| test loss: %.2f | activate lights F1: %.2f | deactivate lights F1: %.2f\n" % (test_intent_acc, test_intent_loss, activate_lights_ap, deactivate_lights_ap) )
 else:
 	test_intent_acc, test_intent_loss = trainer.get_error(test_dataset, error_path=args.error_path, compute_snips_auc_metrics=False, log_file=log_file)
 	print("*intents*| test accuracy: %.2f| test loss: %.2f\n" % (test_intent_acc, test_intent_loss) )
