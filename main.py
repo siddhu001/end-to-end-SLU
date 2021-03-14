@@ -36,7 +36,7 @@ parser.add_argument('--single_label', action='store_true',help='Whether our data
 parser.add_argument('--snips_test_set', action='store_true',help='Whether to evaluate on Snips only.')
 parser.add_argument('--training_fraction', type=float, help='If true, only train on the requested amount of training data.')
 parser.add_argument('--log_suffix', type=str, help='Additional suffix to add to log files')
-
+parser.add_argument('--seed', type=int, default=None, help='Random seed to use; if supplied, overwrite the seed in the config')
 
 args = parser.parse_args()
 pretrain = args.pretrain
@@ -69,7 +69,10 @@ log_suffix = args.log_suffix
 
 # Read config file
 config = read_config(config_path)
-torch.manual_seed(config.seed); np.random.seed(config.seed)
+if args.seed is not None:
+	torch.manual_seed(args.seed); np.random.seed(args.seed)
+else:
+	torch.manual_seed(config.seed); np.random.seed(config.seed)
 
 if pretrain:
 	# Generate datasets
@@ -149,6 +152,10 @@ if train:
 		fraction_string = "_" + fraction_string.replace(".", "_") + "_pct"
 		model_path=model_path + fraction_string
 		log_file=log_file + fraction_string
+
+	if args.seed is not None:
+		log_file=log_file + f"_seed_{args.seed}"
+		model_path=model_path + f"_seed_{args.seed}"
 
 	if save_best_model:
 		best_model_path=model_path + "_best.pth"
