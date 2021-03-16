@@ -363,14 +363,7 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 		best_valid_acc=0.0
 
 	if (use_bert_embeddings and finetune_semantics_embedding):
-		print("okkk")
-		params = [(k, v) for k, v in model.named_parameters() if v.requires_grad]
-		bert_params = {"params": [v for k, v in params if "bert" in k]}
-		bert_params_name = {"params": [k for k, v in params if "bert" in k]}
-		non_bert_params = {"params": [v for k, v in params if "bert" not in k]}
-		non_bert_params_name = {"params": [k for k, v in params if "bert" not in k]}
-		bert_params["lr"] = 1e-5
-		trainer.optimizer = AdamW([bert_params, non_bert_params], lr=config.pretraining_lr, correct_bias=False)
+		trainer.optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
 
 	for epoch in range(config.training_num_epochs): # Train intent model on gold set utterances
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
