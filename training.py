@@ -38,6 +38,8 @@ class Trainer:
 					self.model.load_state_dict(torch.load(os.path.join(self.checkpoint_path, model_path), map_location="cpu"))
 			except:
 				print("Could not load previous model; starting from scratch")
+				print(f"@Vijay: this indicates a problem!!!!!")
+				breakpoint()
 		else:
 			print("No previous model; starting from scratch")
 
