@@ -151,7 +151,8 @@ def get_SLU_datasets(config,
 					 single_label=False,
 					 snips_test_set=False,
 					 downsample_train_factor=None,
-					 stratify_downsampling_for_snips=None):
+					 stratify_downsampling_for_snips=None,
+					 seed=0):
 	"""
 	config: Config object (contains info about model and training)
 	"""
@@ -310,7 +311,7 @@ def get_SLU_datasets(config,
 
 		stratified_sampled_train_df = None
 		for group in intent_groups:
-			sampled_group = group[1].sample(frac=downsample_train_factor, random_state=0).reset_index(drop=True)
+			sampled_group = group[1].sample(frac=downsample_train_factor, random_state=seed).reset_index(drop=True)
 			if stratified_sampled_train_df is None:
 				stratified_sampled_train_df = sampled_group.copy()
 			else:

@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import random
 import pandas as pd
 from models import PretrainedModel, Model, obtain_glove_embeddings, obtain_fasttext_embeddings
 from data import get_ASR_datasets, get_SLU_datasets, read_config
@@ -70,7 +71,12 @@ log_suffix = args.log_suffix
 # Read config file
 config = read_config(config_path)
 if args.seed is not None:
-	torch.manual_seed(args.seed); np.random.seed(args.seed)
+    seed=args.seed
+    np.random.seed(seed=seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 else:
 	torch.manual_seed(config.seed); np.random.seed(config.seed)
 
@@ -173,7 +179,8 @@ if train:
 																  speaker_or_utterance_closed_with_utility_speaker_test=speaker_or_utterance_closed_with_utility_split,
 																  speaker_or_utterance_closed_with_utility_perfect_speaker_test=speaker_or_utterance_closed_with_utility_perfect_split,
 																  snips_test_set=snips_test_set,
-																  downsample_train_factor=training_fraction)
+																  downsample_train_factor=training_fraction,
+																  seed=args.seed)
 
 	# Initialize final model
 	if use_semantic_embeddings: # Load Glove embedding
