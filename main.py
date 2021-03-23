@@ -92,7 +92,7 @@ if pretrain:
 		trainer.save_checkpoint()
 
 if train:
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,single_label=single_label,use_all_gold=True,\
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=False,single_label=single_label,use_all_gold=False,\
 	utterance_closed_with_bleu = utterance_closed_utility_bleu, utterance_closed_no_bleu=utterance_closed_utility_no_bleu)
 
 	# Create corresponding model path based on the implementation
