@@ -200,17 +200,22 @@ use_all_gold = False, asr_setup = False):
 		#synthetic_train_df = synthetic_train_df.set_index(np.arange(len(synthetic_train_df)))
 
 	train_df = pd.concat([synthetic_train_df, real_train_df]).reset_index()
+	two_test_sets = False
 	if not config.seq2seq: # Read valid and test set - Added support for random split and disjoint split
 		
 		if single_label:
 			valid_df = pd.read_csv(os.path.join(base_path, "data/single_label", "valid_data.csv"))
 			test_df = pd.read_csv(os.path.join(base_path, "data/single_label", "test_data.csv"))
 		elif utterance_closed_no_bleu:
+			two_test_sets = True
 			valid_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_noBLEU", "valid_data.csv"))
-			test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_noBLEU", "closed_utterance_test_data.csv"))
+			test_df_utt = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_noBLEU", "closed_utterance_test_data.csv"))
+			test_df_spk = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility_noBLEU", "closed_speaker_test_data.csv"))
 		elif utterance_closed_with_bleu:
+			two_test_sets = True
 			valid_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "valid_data.csv"))
-			test_df = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "closed_utterance_test_data.csv"))
+			test_df_utt = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "closed_utterance_test_data.csv"))
+			test_df_spk = pd.read_csv(os.path.join(base_path, "data/speaker_or_utterance_closed_splits_utility", "closed_speaker_test_data.csv"))
 		else:
 			valid_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "valid_data.csv"))
 			test_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "test_data.csv"))
@@ -287,13 +292,23 @@ use_all_gold = False, asr_setup = False):
 		
 		
 		valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config, words_out = asr_setup, Sy_word = Sy_word)
-		test_dataset = SLUDataset(test_df, base_path, Sy_intent, config, words_out = asr_setup, Sy_word = Sy_word)
+		if two_test_sets:
+			test_dataset_utt = SLUDataset(test_df_utt, base_path, Sy_intent, config, words_out = asr_setup, Sy_word = Sy_word)
+			test_dataset_spk = SLUDataset(test_df_spk, base_path, Sy_intent, config, words_out = asr_setup, Sy_word = Sy_word)
+		else:
+			test_dataset = SLUDataset(test_df, base_path, Sy_intent, config, words_out = asr_setup, Sy_word = Sy_word)
 	else:
 		
 		valid_dataset = SLU_GoldDataset(valid_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
-		test_dataset = SLU_GoldDataset(test_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+		if two_test_sets:
+			test_dataset_utt = SLU_GoldDataset(test_df_utt, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+			test_dataset_spk = SLU_GoldDataset(test_df_spk, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+		else:
+			test_dataset = SLU_GoldDataset(test_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+		
 	
-
+	if two_test_sets:
+		test_dataset = (test_dataset_utt, test_dataset_spk)
 	return train_dataset, valid_dataset, test_dataset
 
 # taken from https://github.com/jfsantos/maracas/blob/master/maracas/maracas.py

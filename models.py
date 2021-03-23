@@ -63,8 +63,10 @@ class BertEncoder(torch.nn.Module):
 				revision=None,
 				use_auth_token=None,
 			)
+		model.train()
 		if torch.cuda.is_available():
 			model.to('cuda')
+		
 		# model.eval()
 		self.encoder = model.bert.to('cuda')
 		# self.encoder = BertModel.from_pretrained(
