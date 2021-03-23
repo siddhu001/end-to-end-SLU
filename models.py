@@ -63,21 +63,19 @@ class BertEncoder(torch.nn.Module):
 				revision=None,
 				use_auth_token=None,
 			)
-		model.train()
 		if torch.cuda.is_available():
 			model.to('cuda')
-		
-		# model.eval()
+		model.train()
 		self.encoder = model.bert.to('cuda')
-		# self.encoder = BertModel.from_pretrained(
-		# 		path_to_pretrained,
-		# 		from_tf=False,
-		# 		config=config,
-		# 		cache_dir=None,
-		# 		revision=None,
-		# 		use_auth_token=None,
-		# 	).to('cuda')
-		
+		self.encoder = BertModel.from_pretrained(
+				path_to_pretrained,
+				from_tf=False,
+				config=config,
+				cache_dir=None,
+				revision=None,
+				use_auth_token=None,
+			).to('cuda')
+
 		self.ix_to_vocab = ix_to_vocab
 
 	def forward(self, x):
@@ -98,7 +96,6 @@ class BertEncoder(torch.nn.Module):
 			sent = " ".join(words)
 			sents.append(sent)
 		
-
 		inputs = self.tokenizer(sents, return_tensors = 'pt', padding=True)
 		for inp in inputs:
 			inputs[inp] = inputs[inp].to('cuda')
@@ -825,6 +822,10 @@ class Model(torch.nn.Module):
 					print("nnnnnooo")
 					for param in self.semantic_embeddings.parameters():
 						param.requires_grad = False
+				else:
+					for param in self.semantic_embeddings.parameters():
+						param.requires_grad = True
+						# param.register_hook(lambda x: print('grad accumulated'))
 			else:
 				self.semantic_embeddings= torch.nn.Embedding(config.vocabulary_size+1,glove_emb_dim)
 				self.semantic_embeddings.weight.data.copy_(torch.from_numpy(glove_embeddings))
@@ -1066,6 +1067,8 @@ class Model(torch.nn.Module):
 
 			out = torch.cat((out,self.semantic_embeddings(x)),dim=-1)
 		else:
+			# print(x.shape)
+			# print(self.semantic_embeddings.training)
 			out = self.semantic_embeddings(x)
 		
 			
