@@ -17,6 +17,7 @@ parser.add_argument('--get_words', action='store_true', help='get words from SLU
 parser.add_argument('--save_words_path', default="/tmp/word_transcriptions.csv", help='path to save audio transcription CSV file')
 parser.add_argument('--postprocess_words', action='store_true', help='postprocess words obtained from SLU pipeline')
 parser.add_argument('--use_semantic_embeddings', action='store_true', help='use Glove embeddings')
+parser.add_argument('--random_word_embeddings', action='store_true', help='use randomly-init torch Embedding layer in NLU setup')
 parser.add_argument('--use_FastText_embeddings', action='store_true', help='use FastText embeddings')
 parser.add_argument('--use_bert_embeddings', action='store_true', help='use Bert embeddings')
 
@@ -37,6 +38,7 @@ parser.add_argument('--single_label', action='store_true',help='Whether our data
 
 args = parser.parse_args()
 pretrain = args.pretrain
+random_word_embeddings = args.random_word_embeddings
 
 train = args.train
 pipeline_train = args.pipeline_train
@@ -69,6 +71,7 @@ single_label = args.single_label
 config = read_config(config_path)
 torch.manual_seed(config.seed); np.random.seed(config.seed)
 
+
 if pretrain:
 	# Generate datasets
 	train_dataset, valid_dataset, test_dataset = get_ASR_datasets(config)
@@ -86,8 +89,8 @@ if pretrain:
 		valid_phone_acc, valid_phone_loss, valid_word_acc, valid_word_loss = trainer.test(valid_dataset)
 
 		print("========= Results: epoch %d of %d =========" % (epoch+1, config.pretraining_num_epochs))
-		print("*phonemes*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_phone_acc, train_phone_loss, valid_phone_acc, valid_phone_loss) )
-		print("*words*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_word_acc, train_word_loss, valid_word_acc, valid_word_loss) )
+		print("*phonemes*| train accuracy: %.3f| train loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (train_phone_acc, train_phone_loss, valid_phone_acc, valid_phone_loss) )
+		print("*words*| train accuracy: %.3f| train loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (train_word_acc, train_word_loss, valid_word_acc, valid_word_loss) )
 
 		trainer.save_checkpoint()
 
@@ -183,7 +186,7 @@ if train:
 		valid_intent_acc, valid_intent_loss = trainer.test(valid_dataset,log_file=log_file)
 
 		print("========= Results: epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
-		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
+		print("*intents*| train accuracy: %.3f| train loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
 
 		trainer.save_checkpoint(model_path=model_path)
 		if save_best_model: # Save best model observed till now
@@ -195,22 +198,22 @@ if train:
 		for test, name in zip([d for d in test_dataset], ['utterance-closed', 'speaker-closed']):
 			test_intent_acc, test_intent_loss = trainer.test(test,log_file=log_file)
 			print("========= Test results, {} =========".format(name))
-			print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
+			print("*intents*| test accuracy: %.3f| test loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
 			if save_best_model:
 				trainer.load_checkpoint(model_path=best_model_path) # Compute performance of best model on test set
 				test_intent_acc, test_intent_loss = trainer.test(test,log_file=log_file)
 				print("========= Test results, {} =========".format(name))
-				print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
+				print("*intents*| test accuracy: %.3f| test loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
 			
 	else:
 		test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
 		print("========= Test results =========")
-		print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
+		print("*intents*| test accuracy: %.3f| test loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
 		if save_best_model:
 			trainer.load_checkpoint(model_path=best_model_path) # Compute performance of best model on test set
 			test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
 			print("========= Test results =========")
-			print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
+			print("*intents*| test accuracy: %.3f| test loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
 
 	
 
@@ -275,7 +278,7 @@ if pipeline_train: # Train model in pipeline manner
 		valid_intent_acc, valid_intent_loss = trainer.pipeline_test_decoder(valid_dataset,  postprocess_words,log_file=log_file)
 
 		print("========= Results: epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
-		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
+		print("*intents*| train accuracy: %.3f| train loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
 		if postprocess_words:
 			trainer.save_checkpoint(model_path="model_state_postprocess.pth")
 		else:
@@ -286,7 +289,7 @@ if pipeline_train: # Train model in pipeline manner
 
 	test_intent_acc, test_intent_loss = trainer.pipeline_test_decoder(test_dataset, postprocess_words,log_file=log_file)
 	print("========= Test results =========")
-	print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
+	print("*intents*| test accuracy: %.3f| test loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
 
 if pipeline_gold_train: # Train model in pipeline manner by using gold set utterances
 	# Generate datasets
@@ -310,8 +313,10 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 			for line in f.readlines():
 				Sy_word.append(line.rstrip("\n"))
-		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
-		model = Model(config=config,pipeline=True, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
+		if use_FastText_embeddings:
+			FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
+			model = Model(config=config,pipeline=True, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
+
 	elif use_bert_embeddings: # use Bert encoder
 		vocab= {}
 		i = 0
@@ -320,8 +325,9 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 			for i in range(len(lines)):
 				vocab[i]=lines[i].rstrip("\n")
 		model = Model(config=config,pipeline=True, use_semantic_embeddings = use_bert_embeddings, use_bert_embeddings = True, glove_embeddings=semantic_embeddings_path,glove_emb_dim=768, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter, ix_to_vocab= vocab)
+
 	else:
-		model = Model(config=config,pipeline=True)
+		model = Model(config=config,pipeline=True, random_init = random_word_embeddings, finetune=finetune_embedding)
 
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
@@ -365,6 +371,17 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 	elif use_bert_embeddings:
 		log_file=log_file+"_bert"
 		only_model_path=only_model_path + "_bert"
+	elif random_word_embeddings:
+		log_file=log_file+"_random_init_word"
+		only_model_path=only_model_path + "_random_init_word"
+
+	if finetune_embedding:
+		log_file=log_file+"_finetune"
+		only_model_path=only_model_path + "_finetune"
+	elif finetune_semantics_embedding:
+		log_file=log_file+"_finetune_semantics"
+		only_model_path=only_model_path + "_finetune_semantics"
+	
 
 	log_file=log_file+".csv"
 	only_model_path=only_model_path + ".pth"
@@ -383,7 +400,7 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 		valid_intent_acc, valid_intent_loss = trainer.pipeline_test_decoder(valid_dataset,gold=True, log_file=log_file)
 
 		print("========= Results: epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
-		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
+		print("*intents*| train accuracy: %.3f| train loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
 		trainer.save_checkpoint(model_path=only_model_path)
 		if save_best_model: # Save best model observed till now
 			if (valid_intent_acc>best_valid_acc):
@@ -398,25 +415,25 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 	# 	valid_intent_acc, valid_intent_loss = trainer.pipeline_test_decoder(valid_dataset, postprocess_words, log_file=log_file)
 
 	# 	print("========= Results: epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
-	# 	print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
+	# 	print("*intents*| train accuracy: %.3f| train loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
 	# 	trainer.save_checkpoint(model_path=with_model_path)
 	if utterance_closed_utility_bleu or utterance_closed_utility_no_bleu:
 		for test, name in zip([d for d in test_dataset], ['utterance-closed', 'speaker-closed']):
 			test_intent_acc, test_intent_loss = trainer.pipeline_test_decoder(test, gold=True, log_file=log_file)
 			print("========= Test results, {} =========".format(name))
-			print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
+			print("*intents*| test accuracy: %.3f| test loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
 			if save_best_model:
 				trainer.load_checkpoint(model_path=best_model_path) # Compute performance of best model on test set
 				test_intent_acc, test_intent_loss = trainer.pipeline_test_decoder(test, gold=True, log_file=log_file)
 				print("========= Test results, {} =========".format(name))
-				print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
+				print("*intents*| test accuracy: %.3f| test loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
 			
 	else:
 		test_intent_acc, test_intent_loss = trainer.pipeline_test_decoder(test_dataset, gold=True, log_file=log_file)
 		print("========= Test results =========")
-		print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
+		print("*intents*| test accuracy: %.3f| test loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
 		if save_best_model:
 			trainer.load_checkpoint(model_path=best_model_path) # Compute performance of best model on test set
 			test_intent_acc, test_intent_loss = trainer.pipeline_test_decoder(test_dataset, gold=True, log_file=log_file)
 			print("========= Test results =========")
-			print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
+			print("*intents*| test accuracy: %.3f| test loss: %.3f| valid accuracy: %.3f| valid loss: %.3f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )

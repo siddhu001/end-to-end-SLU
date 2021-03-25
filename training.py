@@ -84,6 +84,7 @@ class Trainer:
 			self.epoch += 1
 			return train_phone_acc, train_phone_loss, train_word_acc, train_word_loss
 		else: # SLUDataset
+			print("SLU dataset.")
 			
 			train_intent_acc = 0
 			train_intent_loss = 0

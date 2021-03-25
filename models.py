@@ -786,7 +786,7 @@ class Model(torch.nn.Module):
 	"""
 	End-to-end SLU model.
 	"""
-	def __init__(self, config, pipeline=False,finetune=False,use_semantic_embeddings = False, glove_embeddings=None,glove_emb_dim=100, finetune_semantic_embeddings = False, seperate_RNN=False, smooth_semantic= False, smooth_semantic_parameter= 1, use_bert_embeddings = False, ix_to_vocab = None):
+	def __init__(self, config, pipeline=False,finetune=False,use_semantic_embeddings = False, glove_embeddings=None,glove_emb_dim=100, finetune_semantic_embeddings = False, seperate_RNN=False, smooth_semantic= False, smooth_semantic_parameter= 1, use_bert_embeddings = False, ix_to_vocab = None, random_init = False):
 		super(Model, self).__init__()
 		self.is_cuda = torch.cuda.is_available()
 		self.Sy_intent = config.Sy_intent
@@ -811,6 +811,7 @@ class Model(torch.nn.Module):
 			out_dim *= 2 
 		self.use_semantic_embeddings = use_semantic_embeddings
 		self.use_bert_embeddings = use_bert_embeddings 
+		self.random_init = random_init
 		if use_bert_embeddings:
 			assert ix_to_vocab is not None
 		self.seperate_RNN=seperate_RNN
@@ -834,9 +835,11 @@ class Model(torch.nn.Module):
 				self.semantic_embeddings.weight.requires_grad = finetune_semantic_embeddings
 				self.smooth_semantic=smooth_semantic
 				self.smooth_semantic_parameter=smooth_semantic_parameter		
-		if pipeline: # Initialise word embedding for intent model with the weights of pretrained word classifier
+		if pipeline: # Initialise word embedding for intent model randomly or with the weights of pretrained word classifier
 			self.embedding=torch.nn.Embedding(config.vocabulary_size+1,pretrained_model.word_linear.weight.data.shape[1])
-			self.embedding.weight.data[:config.vocabulary_size]=pretrained_model.word_linear.weight.data.clone()
+			if not random_init:
+				print('initializing with pre-trained word classifier features')
+				self.embedding.weight.data[:config.vocabulary_size]=pretrained_model.word_linear.weight.data.clone()
 			self.embedding.weight.requires_grad = finetune
 		
 		# fixed-length output:
@@ -968,6 +971,7 @@ class Model(torch.nn.Module):
 			return
 
 		if self.unfreezing_type == 1:
+			print("unfreezing word layers")
 			trainable_index = 0 # which trainable layer
 			global_index = 1 # which layer overall
 			while global_index <= len(self.pretrained_model.word_layers):
@@ -1064,8 +1068,9 @@ class Model(torch.nn.Module):
 			y_intent = y_intent.cuda()
 		if not self.use_bert_embeddings:
 			out = self.embedding(x)
+			if self.use_semantic_embeddings:
 
-			out = torch.cat((out,self.semantic_embeddings(x)),dim=-1)
+				out = torch.cat((out,self.semantic_embeddings(x)),dim=-1)
 		else:
 			# print(x.shape)
 			# print(self.semantic_embeddings.training)
