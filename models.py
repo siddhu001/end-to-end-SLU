@@ -836,7 +836,10 @@ class Model(torch.nn.Module):
 				self.smooth_semantic=smooth_semantic
 				self.smooth_semantic_parameter=smooth_semantic_parameter		
 		if pipeline: # Initialise word embedding for intent model randomly or with the weights of pretrained word classifier
-			self.embedding=torch.nn.Embedding(config.vocabulary_size+1,pretrained_model.word_linear.weight.data.shape[1])
+			# if we don't random-init, train-vocab-size is the same as vocabulary-size 
+			# if we random init, we only look at words in the train data, so vocab size is reduced 
+			print("Vocab size: {}".format(config.train_vocab_size))
+			self.embedding=torch.nn.Embedding(config.train_vocab_size+1,pretrained_model.word_linear.weight.data.shape[1])
 			if not random_init:
 				print('initializing with pre-trained word classifier features')
 				self.embedding.weight.data[:config.vocabulary_size]=pretrained_model.word_linear.weight.data.clone()

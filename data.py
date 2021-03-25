@@ -138,11 +138,12 @@ def read_config(config_file):
 	return config
 
 def get_SLU_datasets(config,use_gold_utterances=False, utterance_closed_no_bleu = False, utterance_closed_with_bleu = False,single_label=False, 
-use_all_gold = False, asr_setup = False):
+use_all_gold = False, asr_setup = False, use_train_vocab_only = False):
 	"""
 	config: Config object (contains info about model and training)
 	"""
 	base_path = config.slu_path
+	config.train_vocab_size = config.vocabulary_size
 
 	# Split - Added support for random split and disjoint split
 	if not config.seq2seq:
@@ -198,8 +199,10 @@ use_all_gold = False, asr_setup = False):
 		subset_size = round(config.synthetic_dataset_subset_percentage * len(synthetic_train_df))
 		synthetic_train_df = synthetic_train_df.loc[np.random.choice(len(synthetic_train_df), subset_size, replace=False)]
 		#synthetic_train_df = synthetic_train_df.set_index(np.arange(len(synthetic_train_df)))
-
-	train_df = pd.concat([synthetic_train_df, real_train_df]).reset_index()
+	if len(synthetic_train_df) > 0:
+		train_df = pd.concat([synthetic_train_df, real_train_df]).reset_index()
+	else:
+		train_df = real_train_df.reset_index()
 	two_test_sets = False
 	if not config.seq2seq: # Read valid and test set - Added support for random split and disjoint split
 		
@@ -276,10 +279,22 @@ use_all_gold = False, asr_setup = False):
 	Sy_word = None
 	# Create dataset objects
 	if use_gold_utterances or asr_setup: # Created support for training intent model on gold utterances
+		if use_train_vocab_only:
+			tr_transcripts = list(train_df['transcription'].drop_duplicates())
+			word_set = sorted(set([w.lower().strip("?!.,") for script in tr_transcripts for w in script.split(" ")]))
+			config.train_vocab_size = len(word_set)
+			print("using {} train words for vocab".format(len(word_set)))
+		# else:
+		# 	config.train_vocab_size = config.vocabulary_size
 		Sy_word = []
 		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 			for line in f.readlines():
-				Sy_word.append(line.rstrip("\n"))
+				word = line.rstrip("\n")
+				if use_train_vocab_only:
+					if word in word_set:
+						Sy_word.append(word)
+				else:
+					Sy_word.append(line.rstrip("\n"))
 		if not asr_setup:
 			train_dataset = SLU_GoldDataset(train_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
 		else:
@@ -309,6 +324,7 @@ use_all_gold = False, asr_setup = False):
 	
 	if two_test_sets:
 		test_dataset = (test_dataset_utt, test_dataset_spk)
+	 
 	return train_dataset, valid_dataset, test_dataset
 
 # taken from https://github.com/jfsantos/maracas/blob/master/maracas/maracas.py
@@ -430,7 +446,8 @@ class SLU_GoldDataset(torch.utils.data.Dataset):
 		self.augment = False #augment
 		self.SNRs = [0,5,10,15,20]
 		self.seq2seq = config.seq2seq
-		self.config_vocab_size = config.vocabulary_size
+		#self.config_vocab_size = config.vocabulary_size
+		self.config_vocab_size = config.train_vocab_size
 		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU(self.Sy_intent, self.seq2seq))
 		self.config = config
 	def __len__(self):
@@ -446,6 +463,7 @@ class SLU_GoldDataset(torch.utils.data.Dataset):
 		effect = torchaudio.sox_effects.SoxEffectsChain()
 		effect.set_input_file(wav_path)
 		x_utterance = self.df.loc[idx].transcription.split(" ")
+		# oov's are reserved as self.config_vocab_size
 		x=[self.Sy_word.index(k.lower().strip(punctuation)) if k.lower().strip(punctuation) in self.Sy_word else self.config_vocab_size for k in x_utterance]
 
 		if not self.seq2seq:

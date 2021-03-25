@@ -293,8 +293,9 @@ if pipeline_train: # Train model in pipeline manner
 
 if pipeline_gold_train: # Train model in pipeline manner by using gold set utterances
 	# Generate datasets
+	# if random init, make sure to take only the tokens seen during train time, use 0 as the OOV token 
 	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,single_label=single_label,use_all_gold=True,\
-	utterance_closed_with_bleu = utterance_closed_utility_bleu, utterance_closed_no_bleu=utterance_closed_utility_no_bleu)
+	utterance_closed_with_bleu = utterance_closed_utility_bleu, utterance_closed_no_bleu=utterance_closed_utility_no_bleu, use_train_vocab_only = random_word_embeddings)
 
 	print(valid_dataset)
 	print(test_dataset)
@@ -327,6 +328,7 @@ if pipeline_gold_train: # Train model in pipeline manner by using gold set utter
 		model = Model(config=config,pipeline=True, use_semantic_embeddings = use_bert_embeddings, use_bert_embeddings = True, glove_embeddings=semantic_embeddings_path,glove_emb_dim=768, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter, ix_to_vocab= vocab)
 
 	else:
+	
 		model = Model(config=config,pipeline=True, random_init = random_word_embeddings, finetune=finetune_embedding)
 
 	# Train the final model
