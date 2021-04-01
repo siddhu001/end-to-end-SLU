@@ -722,6 +722,7 @@ class Model(torch.nn.Module):
 		self.unfreezing_type = config.unfreezing_type
 		self.unfreezing_index = config.starting_unfreezing_index
 		self.intent_layers = []
+		
 		if config.pretraining_type != 0:
 			self.freeze_all_layers()
 		self.seq2seq = config.seq2seq
@@ -1056,8 +1057,11 @@ class Model(torch.nn.Module):
 			return -log_probs.mean(), torch.tensor([0.])
 
 
-	def predict_intents(self, x):
-		out = self.pretrained_model.compute_features(x)
+	def predict_intents(self, x, from_text = False):
+		if not from_text:
+			out = self.pretrained_model.compute_features(x)
+		else:
+			out = x
 
 		if not self.seq2seq:
 			for layer in self.intent_layers:
