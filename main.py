@@ -39,6 +39,7 @@ parser.add_argument('--wer', action='store_true', help='compute results on split
 parser.add_argument('--dele', action='store_true', help='compute results on split optimised using delete')
 parser.add_argument('--aggressive', action='store_true', help='compute results on split optimised aggressively')
 parser.add_argument('--nonagg', action='store_true', help='compute results on split optimised using delete')
+parser.add_argument('--seed', default=None, help='run on diff variants of same dataset')
 
 args = parser.parse_args()
 pretrain = args.pretrain
@@ -69,6 +70,7 @@ wer=args.wer
 dele=args.dele
 aggressive=args.aggressive
 nonagg = args.nonagg
+seed=args.seed
 
 data_str=f"{resplit_style}_splits"
 
@@ -93,6 +95,8 @@ if aggressive:
 if nonagg:
 	print("yes3")
 	data_str=data_str+"_nonagg"
+if seed is not None:
+	data_str=data_str+"_"+str(seed)
 
 single_label = args.single_label
 nlu_setup = args.nlu_setup 
@@ -163,6 +167,10 @@ if train:
 	if nonagg:
 		log_file=log_file+"_nonagg"
 		model_path=model_path + "_nonagg"
+
+	if seed is not None:
+		log_file=log_file+"_"+str(seed)
+		model_path=model_path + "_"+str(seed)
 
 	if use_semantic_embeddings:
 		log_file=log_file+"_glove"
