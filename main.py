@@ -195,7 +195,6 @@ if train:
 		best_model_path=model_path + "_best.pth"
 		best_valid_acc=0.0
 
-	log_file=log_file+".csv"
 	model_path=model_path + ".pth"
 
 	# Generate datasets
@@ -232,8 +231,13 @@ if train:
 
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
-	if restart: trainer.load_checkpoint()
-	# config.training_num_epochs
+	if restart: 
+		trainer.load_checkpoint(model_path)
+		config.training_num_epochs=0
+		valid_intent_acc=0
+		valid_intent_loss=0
+		log_file=log_file+"_restart"
+	log_file=log_file+".csv"
 	for epoch in range(config.training_num_epochs):
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		train_intent_acc, train_intent_loss = trainer.train(train_dataset,log_file=log_file)
