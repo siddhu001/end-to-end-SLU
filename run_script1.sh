@@ -1,8 +1,6 @@
-CUDA_VISIBLE_DEVICES=0 python main.py --train --config_path=experiments/no_unfreezing.cfg --save_best_model  --resplit_style=speaker_or_utterance_closed --utility --noBLEU --seed 2 & 
-CUDA_VISIBLE_DEVICES=1 python main.py --train --config_path=experiments/no_pretraining.cfg --save_best_model  --resplit_style=speaker_or_utterance_closed --utility --noBLEU --seed 2 & 
-CUDA_VISIBLE_DEVICES=2 python main.py --train --config_path=experiments/unfreeze_all_layers.cfg --save_best_model  --resplit_style=speaker_or_utterance_closed --utility --noBLEU --seed 2 &
-CUDA_VISIBLE_DEVICES=3 python main.py --train --config_path=experiments/unfreeze_word_layers.cfg --save_best_model  --resplit_style=speaker_or_utterance_closed --utility --noBLEU --seed 2 &
-CUDA_VISIBLE_DEVICES=4 python main.py --train --config_path=experiments/no_unfreezing.cfg --save_best_model  --resplit_style=speaker_or_utterance_closed --utility --noBLEU --seed 3 & 
-CUDA_VISIBLE_DEVICES=5 python main.py --train --config_path=experiments/no_pretraining.cfg --save_best_model  --resplit_style=speaker_or_utterance_closed --utility --noBLEU --seed 3 & 
-CUDA_VISIBLE_DEVICES=6 python main.py --train --config_path=experiments/unfreeze_all_layers.cfg --save_best_model  --resplit_style=speaker_or_utterance_closed --utility --noBLEU --seed 3 &
-CUDA_VISIBLE_DEVICES=7 python main.py --train --config_path=experiments/unfreeze_word_layers.cfg --save_best_model  --resplit_style=speaker_or_utterance_closed --utility --noBLEU --seed 3 &
+CUDA_VISIBLE_DEVICES=0 python main.py --train --config_path=experiments/no_unfreezing.cfg --save_best_model  --resplit_style=speaker_or_utterance_closed --utility --noBLEU --seed 2 --restart
+CUDA_VISIBLE_DEVICES=3 python main.py --train --config_path=experiments/unfreeze_word_layers.cfg --save_best_model  --resplit_style=speaker_or_utterance_closed --utility --noBLEU --seed 2 --restart
+CUDA_VISIBLE_DEVICES=4 python main.py --train --config_path=experiments/no_unfreezing.cfg --save_best_model  --resplit_style=speaker_or_utterance_closed --utility --noBLEU --seed 3 --restart
+CUDA_VISIBLE_DEVICES=5 python main.py --train --config_path=experiments/no_pretraining.cfg --save_best_model  --resplit_style=speaker_or_utterance_closed --utility --noBLEU --seed 3 --restart
+CUDA_VISIBLE_DEVICES=6 python main.py --train --config_path=experiments/unfreeze_all_layers.cfg --save_best_model  --resplit_style=speaker_or_utterance_closed --utility --noBLEU --seed 3 --restart
+CUDA_VISIBLE_DEVICES=7 python main.py --train --config_path=experiments/unfreeze_word_layers.cfg --save_best_model  --resplit_style=speaker_or_utterance_closed --utility --noBLEU --seed 3 --restart
